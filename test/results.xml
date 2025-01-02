@@ -1,0 +1,6 @@
+<testsuites name="results">
+  <testsuite name="all" package="all">
+    <property name="random_seed" value="1735785088" />
+    <testcase name="test_vc_cpu" classname="test" file="/home/paul/tt10/vc16/test/test.py" lineno="26" time="12.627771615982056" sim_time_ns="672940000.001" ratio_time="53290479.149092995" />
+  </testsuite>
+</testsuites>
