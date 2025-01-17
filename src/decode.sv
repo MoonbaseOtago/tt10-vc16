@@ -359,11 +359,7 @@ module decode(input clk, input reset,
 						c_op = `OP_ADD;
 						c_rs2 = {1'b1, ins[4:2]};
 						c_rs1 = {1'b1, 3'b111};
-						if (RV==16) begin
-							c_imm = {{(RV-9){ins[9]}}, ins[9:7], ins[5], ins[12:10],ins[6], 1'b0};
-						end else begin
-							c_imm = {{(RV-10){ins[9]}}, ins[9:7], ins[5], ins[12:10],ins[6], 2'b0};
-						end
+						c_imm = {{(RV-8){ins[9]}}, ins[9:7], ins[5], ins[12:10],ins[6]};
 					end
 			3'b110:	begin	// swsp  **
 						c_store = 1;
