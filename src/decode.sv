@@ -431,7 +431,7 @@ module decode(input clk, input reset,
 						c_op = `OP_ADD;
 						c_rs2 = {1'b1, ins[4:2]};
 						c_rs1 = {1'b1, ins[9:7]};
-						c_imm = {{(RV-4){1'b0}}, ins[11:10],ins[6], 1'b0};
+						c_imm = {{(RV-6){1'b0}}, ins[5], ins[12:10],ins[6], 1'b0};
 						c_trap = !supmode && !user_io;
 					end
 			3'b010: begin 	// lwio
@@ -441,7 +441,7 @@ module decode(input clk, input reset,
 						c_cond = 3'bxx0;
 						c_rd = {1'b1, ins[4:2]};
 						c_rs1 = {1'b1, ins[9:7]};
-						c_imm = {{(RV-4){1'b0}}, ins[11:10],ins[6], 1'b0};
+						c_imm = {{(RV-6){1'b0}}, ins[5], ins[12:10],ins[6], 1'b0};
 						c_trap = !supmode && !user_io;
 				    end
 			3'b011:
