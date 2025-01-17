@@ -124,7 +124,7 @@ module decode(input clk, input reset,
 						c_cond = 3'bxx0;
 						c_rd = {1'b1, ins[4:2]};
 						c_rs1 = {1'b1, 3'b111};
-						c_imm = {{(RV-8){ins[9]}}, ins[9:7], ins[5], ins[12:10],ins[6]};
+						c_imm = {{(RV-8){ins[9]}}, ins[9:7], ins[5], ins[12:10],ins[6], 1'b0};
 				    end
 			3'b010: begin 	// lw
 						c_load = 1;
