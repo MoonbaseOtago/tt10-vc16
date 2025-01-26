@@ -340,12 +340,12 @@ int v;
 		fprintf(stderr, "%d: invalid offset (must be word aligned)\n", line);
 		return 0;
 	}
-	if (v < 0 || v >= (1<<4)) {
+	if (v < 0 || v >= (1<<6)) {
 		errs++;
-		fprintf(stderr, "%d: invalid offset (must be >=-8 <8)\n", line);
+		fprintf(stderr, "%d: invalid offset (must be >=-32 <32)\n", line);
 		return 0;
 	}
-	return ( (((v>>1)&1)<<6) | (((v>>2)&3)<<10));
+	return ( (((v>>1)&1)<<6) | (((v>>2)&7)<<10) | (((v>>5)&1)<<5) );
 }
 
 int

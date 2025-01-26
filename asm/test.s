@@ -496,7 +496,7 @@ xx:
 	mv	a0, a2
 	jal	send		// 0x00
 	swap	a0, a2
-	jal	send		// 0x60
+	jal	send		// 0x80
 	lui	a2, 0x7f00
 	mv	a0, a2
 	jal	send		// 0x00
