@@ -245,13 +245,26 @@ module decode(input clk, input reset,
 						2'b10: c_op = `OP_AND;
 						2'b11: begin
 								c_needs_rs2 = 1;
-								case ({ins[12],ins[6:5]}) // synthesis full_case parallel_case
-								3'b0_00:	c_op = `OP_SUB;
-								3'b0_01:	c_op = `OP_XOR;
+								casez ({ins[12],ins[6:5]}) // synthesis full_case parallel_case
+								3'b0_0?:	begin
+												c_rs2[3] = ins[5];
+												c_op = `OP_SUB;
+												c_trap = !supmode && (c_rs2 >= 4'b0011 && c_rs2 <= 4'b0110);
+											end
 								3'b0_10:	c_op = `OP_OR;
 								3'b0_11:	c_op = `OP_AND;
-								3'b1_00:	begin c_op = `OP_SUB; c_set_cc = 1; end
-								3'b1_01:	begin c_op = `OP_ADD; c_set_cc = 1; end
+								3'b1_0?:	begin
+												c_rs2[3] = ins[5];
+												c_op = `OP_SUB;
+												c_set_cc = 1;
+												c_trap = !supmode && (c_rs2 >= 4'b0011 && c_rs2 <= 4'b0110);
+											end
+								3'b1_1?:	begin
+												c_rs2[3] = ins[5];
+												c_op = `OP_ADD;
+												c_set_cc = 1;
+												c_trap = !supmode && (c_rs2 >= 4'b0011 && c_rs2 <= 4'b0110);
+											end
 								default: c_trap = 1;
 								endcase
 							   end
@@ -487,6 +500,7 @@ module decode(input clk, input reset,
 													end
 											default:	c_trap = 1;
 											endcase
+								3'b1_10:	c_op = `OP_XOR;
 								default:	c_trap = 1;
 								endcase
 							   end

@@ -1,4 +1,4 @@
-%token t_la t_lr t_value t_sp t_epc t_csr t_s0 t_s1 t_a0 t_a1 t_a2 t_a3 t_a4 t_a5 t_and t_or t_xor t_sub t_add t_mv t_nop t_inv t_ebreak t_jalr t_jr t_lw t_lb t_sw t_sb t_lea t_lui t_li t_beqz t_bnez t_bltz t_bgez t_j t_jal t_sll t_srl t_sra t_word t_name t_nl t_mul t_mulhi t_mmu t_addb t_addbu t_syscall t_stmp t_swapsp t_shl t_shr t_zext t_sext t_ldio t_stio t_flush t_dcache t_icache t_ret t_swap t_addpc t_div t_invmmu t_text t_data t_bss t_byte t_extern t_space t_num_label t_global t_string t_stringv t_align t_r0 t_r1 t_r2 t_r3 t_r4 t_r5 t_r6 t_r7 t_x0 t_jalfar t_js t_jals t_bgezs t_bltzs t_beqzs t_bnezs t_addc t_subc t_blez t_bgtz t_neg t_file t_ident t_size t_comm t_lcomm
+%token t_la t_lr t_value t_sp t_epc t_csr t_s0 t_s1 t_a0 t_a1 t_a2 t_a3 t_a4 t_a5 t_and t_or t_xor t_sub t_add t_mv t_nop t_inv t_ebreak t_jalr t_jr t_lw t_lb t_sw t_sb t_lea t_lui t_li t_beqz t_bnez t_bltz t_bgez t_j t_jal t_sll t_srl t_sra t_word t_name t_nl t_mul t_mulhi t_mmu t_addb t_addbu t_syscall t_stmp t_swapsp t_shl t_shr t_zext t_sext t_ldio t_stio t_flush t_dcache t_icache t_ret t_swap t_addpc t_div t_invmmu t_text t_data t_bss t_byte t_extern t_space t_num_label t_global t_string t_stringv t_align t_r0 t_r1 t_r2 t_r3 t_r4 t_r5 t_r6 t_r7 t_x0 t_jalfar t_js t_jals t_bgezs t_bltzs t_beqzs t_bnezs t_addc t_subc t_blez t_bgtz t_neg t_file t_ident t_size t_comm t_lcomm t_ascii
 %start  program
 %%
 
@@ -73,10 +73,10 @@ ins:		t_and  rm ',' rm 	{ $$ = 0x8c61|($2<<7)|($4<<2); }
 	|	t_zext  rm      	{ $$ = 0x9c2b|($2<<7); } 
 	|	t_inv  rm      		{ $$ = 0x9c2f|($2<<7); } 
 	|	t_neg  rm      		{ $$ = 0x9c33|($2<<7); } 
-	|	t_xor  rm ',' rm        { $$ = 0x8c21|($2<<7)|($4<<2); } 
-	|	t_sub  rm ',' rm        { $$ = 0x8c01|($2<<7)|($4<<2); } 
-	|	t_subc  rm ',' rm        { $$ = 0x9c01|($2<<7)|($4<<2); } 
-	|	t_addc  rm ',' rm        { $$ = 0x9c21|($2<<7)|($4<<2); } 
+	|	t_xor  rm ',' rm        { $$ = 0x9c43|($2<<7)|($4<<2); } 
+	|	t_sub  rm ',' r         { $$ = 0x8c01|($2<<7)|($4<<2); } 
+	|	t_subc  rm ',' r        { $$ = 0x9c01|($2<<7)|($4<<2); } 
+	|	t_addc  rm ',' r        { $$ = 0x9c41|($2<<7)|($4<<2); } 
 	|	t_and  rm ',' exp	{ $$ = 0x8801|($2<<7)|imm6($4); }
 	|	t_or  rm ',' exp	{ $$ = 0x8803|($2<<7)|imm6($4); }
 	|	t_add  t_sp ',' exp 	{ $$ = 0x6101 | addsp($4); }
@@ -140,6 +140,36 @@ ins:		t_and  rm ',' rm 	{ $$ = 0x8c61|($2<<7)|($4<<2); }
 	|	t_lea rm ',' exp '(' t_sp ')' { $$ = 0x0000 | ($2<<2) | zoffX($4); }
 	|	t_lea rm ',' '(' t_sp ')'{ $$ = 0x0000 | ($2<<2) | zoffX(0); }
 	|	t_lui    r ',' exp	{ $$ = 0x6001 | (($2)<<7) | luioff($4,0); }	
+	|	t_la     rm ',' exp	{ if (simple_li($4)) { $$ = 0x4001 | ($2<<7) | lioff($4); } else
+						{
+							int delta = $4;
+							if (delta&0x80) {
+                                                		delta = (delta&~0xff)+0x100;
+                                        		} else {
+                                                		delta = delta&~0xff;
+                                        		}
+						 	emit(0x6001|((8|$2)<<7)|luioff(delta, 0));
+							delta = ($4)&0xff;
+                                			if (delta&0x80)
+                                        			delta = -(0x100-delta);
+							$$ = 0x0001 | ($2<<7) | imm8(delta, 0);
+						}}
+	|	t_li	rm ',' t_name '-' t_name { unsigned short a=ref_label($4, 10, 0), b= ref_label($6, 10, 0);
+							a = a-b;
+						     if (simple_li(a)) { $$ = 0x4001 | ($2<<7) | lioff(a); } else
+						{
+							int delta = a;
+							if (delta&0x80) {
+                                                		delta = (delta&~0xff)+0x100;
+                                        		} else {
+                                                		delta = delta&~0xff;
+                                        		}
+						 	emit(0x6001|((8|$2)<<7)|luioff(delta, 0));
+							delta = (a)&0xff;
+                                			if (delta&0x80)
+                                        			delta = -(0x100-delta);
+							$$ = 0x0001 | ($2<<7) | imm8(delta, 0);
+						}}
 	|	t_li     rm ',' exp	{ if (simple_li($4)) { $$ = 0x4001 | ($2<<7) | lioff($4); } else
 						{
 							int delta = $4;
@@ -154,6 +184,19 @@ ins:		t_and  rm ',' rm 	{ $$ = 0x8c61|($2<<7)|($4<<2); }
                                         			delta = -(0x100-delta);
 							$$ = 0x0001 | ($2<<7) | imm8(delta, 0);
 						}}
+	|	t_la     rx ',' exp	{ 
+							int delta = $4;
+							if (delta&0x80) {
+                                                		delta = (delta&~0xff)+0x100;
+                                        		} else {
+                                                		delta = delta&~0xff;
+                                        		}
+						 	emit(0x6001|(($2)<<7)|luioff(delta, 0));
+							delta = ($4)&0xff;
+                                			if (delta&0x80)
+                                        			delta = -(0x100-delta);
+							$$ = 0x2002 | ($2<<7) | imm8(delta, 0);
+						}
 	|	t_li     rx ',' exp	{ 
 							int delta = $4;
 							if (delta&0x80) {
@@ -252,6 +295,8 @@ ins:		t_and  rm ',' rm 	{ $$ = 0x8c61|($2<<7)|($4<<2); }
 	|	t_srl	rm ',' exp 	{ $$ = 0x8001 | ($2<<7) | shift_exp($4); }
 	|	t_sra	rm ',' rm	{ $$ = 0x9401 | ($2<<7) | ($4<<2); }
 	|	t_sra	rm ',' exp	{ $$ = 0x8401 | ($2<<7) | shift_exp($4); }
+	|	t_la	rm ',' t_num_label 	{ ref_label($4, 4, 0); emit(0x6001|((8|$2)<<7)); $$ = 0x0001 | ($2<<7);  }
+	|	t_la	rm ',' t_num_label '+' exp { ref_label($4, 4, $6); emit(0x6001|((8|$2)<<7)); $$ = 0x0001 | ($2<<7); }
 	|	t_la	rm ',' t_name 	{ ref_label($4, 4, 0); emit(0x6001|((8|$2)<<7)); $$ = 0x0001 | ($2<<7);  }
 	|	t_la	rm ',' t_name '+' exp 	{ ref_label($4, 4, $6); emit(0x6001|((8|$2)<<7)); $$ = 0x0001 | ($2<<7); }
 	|	t_la	rx ',' t_name 	{ ref_label($4, 4, 0); emit(0x6001|(($2)<<7)); $$ = 0x2002 | ($2<<7);  }
@@ -285,6 +330,7 @@ inw:		ins			{ emit($1); }
 inb:		'.' t_space exp		{ emit_space($3); }
 	|	'.' t_byte exp		{ emit_data(0, $3); }
 	|	'.' t_string t_stringv	{ emit_string(); }
+	|	'.' t_ascii t_stringv	{ emit_string(); }
 	;
 		
 
@@ -298,8 +344,8 @@ line:		label nl
 	|	'.' t_text nl		{ set_seg(0); }
 	|	'.' t_data nl		{ set_seg(1); }
 	|	'.' t_bss nl		{ set_seg(2); }
-	|	'.' t_extern t_name nl	{ set_extern($3); }
-	|	'.' t_global t_name nl	{ set_global($3); }
+	|	'.' t_extern e_name_list nl
+	|	'.' t_global g_name_list nl
 	|	'.' t_file t_stringv nl  { set_file(); }
 	|	'.' t_ident t_stringv nl  
 	|	'.' t_size t_name ',' '.' '-' t_name  nl  
@@ -310,6 +356,14 @@ line:		label nl
 
 nl :		t_nl
 	|	';'
+	;
+
+e_name_list :	t_name 			{set_extern($1);}
+	|	e_name_list ',' t_name	{set_extern($3);}
+	;
+
+g_name_list :	t_name 			{set_global($1);}
+	|	g_name_list ',' t_name	{set_global($3);}
 	;
 
 program:	line

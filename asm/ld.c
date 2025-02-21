@@ -2,6 +2,8 @@
 static char *sccsid = "@(#)ld.c	4.2 1/2/94";
 #endif
 
+static hreset();
+
 /*
  * 4.3 1/14/94 - sms
  *	Make the number of VM segments a compile time option in the Makefile.
@@ -44,10 +46,368 @@ static char *sccsid = "@(#)ld.c	4.2 1/2/94";
 #include <signal.h>
 #include <sys/stat.h>
 #include <sys/file.h>
-#include <a.out.h>
-#include <ar.h>
+#include <string.h>
+
+FILE *fdopen(int fd, const char *mode);
+#define HAVE_VMF
+#ifdef HAVE_VMF
+
+typedef u_int32_t u_long;
+typedef unsigned short u_int;
+typedef unsigned short u_short;
+typedef unsigned char u_car;
+
+/*#include <sys/exec.h> */
+#ifndef _EXEC_
+#define _EXEC_
+/*
+ * Header prepended to each a.out file.
+ */
+struct  exec {
+        short     a_magic;        /* magic number */
+unsigned short    a_text;         /* size of text segment */
+unsigned short    a_data;         /* size of initialized data */
+unsigned short    a_bss;          /* size of uninitialized data */
+unsigned short    a_syms;         /* size of symbol table */
+unsigned short    a_entry;        /* entry point */
+unsigned short    a_unused;       /* not used */
+unsigned short    a_flag;         /* relocation info stripped */
+};
+
+#define NOVL    15              /* number of overlays */
+struct  ovlhdr {
+        short     max_ovl;        /* maximum overlay size */
+unsigned short    ov_siz[NOVL];   /* size of i'th overlay */
+};
+/*
+ * eXtended header definition for use with the new macros in a.out.h
+*/
+struct  xexec {
+        struct  exec    e;
+        struct  ovlhdr  o;
+        };
+
+#define A_MAGIC1        0407    /* normal */
+#define A_MAGIC2        0410    /* read-only text */
+#define A_MAGIC3        0411    /* separated I&D */
+#define A_MAGIC4        0405    /* overlay */
+#define A_MAGIC5        0430    /* auto-overlay (nonseparate) */
+#define A_MAGIC6        0431    /* auto-overlay (separate) */
+
+#endif
+
+
+#ifndef _RANLIB_H_
+#define _RANLIB_H_
+
+#define RANLIBMAG       "__.SYMDEF"     /* archive file name */
+#define RANLIBSKEW      3               /* creation time offset */
+
+struct ranlib {
+        union {
+                unsigned short ran_strx;         /* string table index */
+                char *ran_name;         /* in memory symbol name */
+        } ran_un;
+        unsigned short ran_off;                  /* archive file offset */
+};
+
+#endif /* !_RANLIB_H_ */
+
+#ifndef _AR_H_
+#define _AR_H_
+
+/* Pre-4BSD archives had these magic numbers in them. */
+#define OARMAG1 0177555
+#define OARMAG2 0177545
+
+#define ARMAG           "!<arch>\n"     /* ar "magic number" */
+#define SARMAG          8               /* strlen(ARMAG); */
+
+#define AR_EFMT1        "#1/"           /* extended format #1 */
+
+struct ar_hdr {
+        char ar_name[16];               /* name */
+        char ar_date[12];               /* modification time */
+        char ar_uid[6];                 /* user id */
+        char ar_gid[6];                 /* group id */
+        char ar_mode[8];                /* octal file permissions */
+        char ar_size[10];               /* size in bytes */
+#define ARFMAG  "`\n"
+        char ar_fmag[2];                /* consistency check */
+};
+
+#endif /* !_AR_H_ */
+
+#ifndef MAXNAMLEN
+#define MAXNAMLEN       63
+#endif
+
+
+#ifndef _AOUT_H_
+#define _AOUT_H_
+
+
+#define N_BADMAG(x) \
+        (((x).a_magic)!=A_MAGIC1 && ((x).a_magic)!=A_MAGIC2 && \
+        ((x).a_magic)!=A_MAGIC3 && ((x).a_magic)!=A_MAGIC4 && \
+        ((x).a_magic)!=A_MAGIC5 && ((x).a_magic)!=A_MAGIC6)
+
+#define N_TXTOFF(x) \
+        ((x).a_magic==A_MAGIC5 || (x).a_magic==A_MAGIC6 ? \
+        sizeof(struct ovlhdr) + sizeof(struct exec) : sizeof(struct exec))
+
+/*
+ * The following were added as part of the new object file format.  They
+ * call functions because calculating the sums of overlay sizes was too
+ * messy (and verbose) to do 'inline'.
+ *
+ * NOTE: if the magic number is that of an overlaid object the program
+ * must pass an extended header ('xexec') as the argument.
+*/
+
+/*#include <sys/types.h> */
+
+off_t   n_stroff(), n_symoff(), n_datoff(), n_dreloc(), n_treloc();
+
+#define N_STROFF(e) (n_stroff(&e))
+#define N_SYMOFF(e) (n_symoff(&e))
+#define N_DATOFF(e) (n_datoff(&e))
+#define N_DRELOC(e) (n_dreloc(&e))
+#define N_TRELOC(e) (n_treloc(&e))
+
+off_t
+n_stroff(ep)
+        register struct xexec *ep;
+        {
+        off_t   l;
+
+        l = n_symoff(ep);
+        l += ep->e.a_syms;
+        return(l);
+        }
+
+off_t   
+n_datoff(ep)
+        register struct xexec *ep;
+        {
+        off_t   l;
+        
+        l = n_treloc(ep);
+        l -= ep->e.a_data;
+        return(l);
+        }
+
+
+off_t
+n_dreloc(ep)
+        register struct xexec *ep;
+        {
+        off_t   l;
+        register u_short *ov = ep->o.ov_siz;
+        register int    i;
+
+        l = (off_t)sizeof (struct exec) + ep->e.a_text + ep->e.a_data;
+        if      (ep->e.a_magic == A_MAGIC5 || ep->e.a_magic == A_MAGIC6)
+                {
+                for     (i = 0; i < NOVL; i++)
+                        l += *ov++;
+                l += sizeof (struct ovlhdr);
+                }
+        l += ep->e.a_text;
+        return(l);
+}
+
+off_t
+n_treloc(ep)
+        register struct xexec *ep;
+        {
+        off_t   l;
+
+        l = n_dreloc(ep);
+        l -= ep->e.a_text;
+        return(l);
+        }
+
+off_t
+n_symoff(ep)
+        register struct xexec *ep;
+        {
+        register int    i;
+        register u_short *ov;
+        off_t   sum, l;
+
+        l = (off_t) N_TXTOFF(ep->e);
+        sum = (off_t)ep->e.a_text + ep->e.a_data;
+        if      (ep->e.a_magic == A_MAGIC5 || ep->e.a_magic == A_MAGIC6)
+                {
+                for     (ov = ep->o.ov_siz, i = 0; i < NOVL; i++)
+                        sum += *ov++;
+                }
+        l += sum;
+        if      ((ep->e.a_flag & 1) == 0)       /* relocation present? */
+                l += sum;
+        return(l);
+        }
+
+
+#define _AOUT_INCLUDE_
+/*#include <nlist.h> */
+
+#ifndef _NLIST_H_
+#define _NLIST_H_
+/*#include <sys/types.h> */
+
+/*
+ * Symbol table entry format.  The #ifdef's are so that programs including
+ * nlist.h can initialize nlist structures statically.
+ */
+
+struct  oldnlist {              /* XXX - compatibility/conversion aid */
+        char    n_name[8];      /* symbol name */
+        short     n_type;         /* type flag */
+unsigned short    n_value;        /* value */
+};
+
+struct  nlist {
+#ifdef  _AOUT_INCLUDE_
+        union {
+                char *n_name;   /* In memory address of symbol name */
+                unsigned short n_strx;   /* String table offset (file) */
+        } n_un;
+#else
+        char    *n_name;        /* symbol name (in memory) */
+        char    *n_filler;      /* need to pad out to the union's size */
+#endif
+        unsigned char  n_type;         /* Type of symbol - see below */
+        char    n_ovly;         /* Overlay number */
+        unsigned short   n_value;        /* Symbol value */
+};
+struct real_nlist {
+        union {
+                unsigned short n_strx;   /* String table offset (file) */
+        } n_un;
+	unsigned short filler;
+        unsigned char  n_type;         /* Type of symbol - see below */
+        char    n_ovly;         /* Overlay number */
+        unsigned short   n_value;        /* Symbol value */
+};
+#define RNL
+/*
+ * Simple values for n_type.
+ */
+#define N_UNDF  0x00            /* undefined */
+#define N_ABS   0x01            /* absolute */
+#define N_TEXT  0x02            /* text segment */
+#define N_DATA  0x03            /* data segment */
+#define N_BSS   0x04            /* bss segment */
+#define N_REG   0x14            /* register symbol */
+#define N_FN    0x1f            /* file name */
+
+#define N_EXT   0x20            /* external (global) bit, OR'ed in */
+#define N_TYPE  0x1f            /* mask for all the type bits */
+
+#define N_FORMAT        "%06o"  /* namelist value format; XXX */
+#endif  /* !_NLIST_H_ */
+ 
+
+#endif  /* !_AOUT_H_ */
+
+
+#include <stdlib.h>
+
+
+#define MAXSEGNO        512     /* max number of segments in a space */
+#define BYTESPERSEG     1024    /* must be power of two! */
+#define LOG2BPS         10      /* log2(BYTESPERSEG) */
+#define WORDSPERSEG     (BYTESPERSEG/sizeof (int))
+int nmapsegs, nswaps;
+struct vspace {
+	int     v_fd;           /* file for swapping */
+        off_t    v_foffset;       /*  offset for computing file
+addresses */
+        int     v_maxsegno;     /* number of segments  in  this
+space */
+};
+
+struct dlink {                  /* general double link structure */
+	struct dlink *fwd;      /* forward link */
+        struct dlink *back;     /* back link */
+};
+
+struct     vseg  {                    /* structure of a seg‐
+ment in memory */
+        struct    dlink     s_link;        /* for linking  into
+lru list */
+        int  	   s_segno;            /* segment number */
+        struct     vspace     *s_vspace;       /* which virtual
+space */
+        int  s_lock_count;
+        int     s_flags;
+        union {
+        	int  _winfo[WORDSPERSEG];     /* the  actual  seg‐
+ment */
+        	char _cinfo[BYTESPERSEG];
+	} v_un;
+};
+#define   s_winfo   v_un._winfo
+#define   s_cinfo   v_un._cinfo
+
+typedef long    VADDR;
+#define VMMODIFY(seg) 
+#define VSEG(va) ((short)(va >> LOG2BPS))
+#define VOFF(va) ((u_short)va % BYTESPERSEG)
+
+static struct vspace vspace;
+
+static struct vseg **segment_list;
+int 
+vminit(int nseg)
+{
+	segment_list = malloc(sizeof(*segment_list)*nseg);
+	memset(segment_list, 0, sizeof(*segment_list)*nseg);
+	return 0;
+}
+
+int 
+vmopen(struct vspace *space, char *filename)
+{
+	return 0;
+}
+
+void vmflush() {}
+void vmclose(struct vspace *space) {}
+
+struct vseg *vmmapseg(struct    vspace    *space, int segno)
+{
+	if (segment_list[segno]) 
+		return segment_list[segno];
+
+	struct vseg *seg = segment_list[segno] = malloc(sizeof(*seg));
+	if (seg) {
+		seg->s_segno = segno;
+		seg->s_vspace = space;
+		seg->s_lock_count = 0;
+		seg->s_flags = 0;
+	}
+	return seg;
+}
+
+void vmlock(struct    vseg *seg) {}
+void vmunlock(struct    vseg *seg) {}
+void vmclrseg(struct    vseg *seg) {memset(&seg->s_cinfo, 0, BYTESPERSEG); }
+void vmmodify(struct    vseg *seg) {}
+
+int putw(int w, FILE *f) {
+	putc(w&0xff, f);
+	putc((w>>8)&0xff, f);
+}
+
+#else
 #include <ranlib.h>
 #include <vmf.h>
+#include <a.out.h>
+#include <ar.h>
+#endif
 #include "archive.h"
 
 /*
@@ -207,7 +567,11 @@ typedef struct {
 	typedef struct
 		{
 		union	{
+#ifdef RNL
+			short	*iptr;
+#else
 			int	*iptr;
+#endif
 			char	*cptr;
 			} ptr;
 		int	bno;
@@ -315,7 +679,8 @@ int	iflag;		/* I/D space separated */
 	char	*ofilename = "l.out";
 	int	infil;			/* current input file descriptor */
 	char	*filname;		/* and its name */
-	char	tfname[] = "/tmp/ldaXXXXX";
+	/*char	tfname[] = "/tmp/ldaXXXXX";*/
+	char	*tfname;
 
 	FILE	*toutb, *doutb, *troutb, *droutb, *soutb, *voutb;
 
@@ -347,6 +712,7 @@ u_int	ovbase;			/* The base address of the overlays */
 	off_t	skip();
 extern	long	lseek(), atol(), strtol();
 extern	char	*mktemp();
+extern char *tempnam(const char *dir, const char *pfx);
 
 main(argc, argv)
 char **argv;
@@ -645,7 +1011,8 @@ load1arg(cp, flag)
 	{
 	off_t nloc;
 	int kind, tnum;
-	long	ltnum, strsize;
+	long	ltnum;
+	u_long strsize;
 
 	kind = getfile(cp, flag, 1);
 	if (Mflag)
@@ -694,7 +1061,7 @@ load1arg(cp, flag)
 
 		rstrtab = NULL;
 		lseek(infil, nloc, L_SET);
-		read(infil, &strsize, sizeof (long));
+		read(infil, &strsize, sizeof (u_long));
 		if	(strsize <= 8192L)
 			{
 			rstrtab = (char *)malloc((int)strsize);
@@ -811,7 +1178,7 @@ ldrand(totnum, sloc)
 			else
 				{
 				dseek(STRINGS2, tp->ran_un.ran_strx + sloc +
-					sizeof (long), 07777);
+					sizeof (u_long), 07777);
 				mgets(localname, NNAMESIZE, STRINGS2);
 				}
 			hp = slookup(localname);
@@ -864,7 +1231,7 @@ load1(libflg, loc)
 	VADDR	vsym;
 	struct	nlist objsym;
 	off_t	strloc;
-	long	strsize;
+	u_long	strsize;
 	char	*strtab;
 register struct vseg *seg;
 
@@ -887,7 +1254,7 @@ register struct vseg *seg;
 
 	strloc = loc + N_STROFF(filhdr);
 	lseek(infil, strloc, L_SET);
-	read(infil, &strsize, sizeof (long));
+	read(infil, &strsize, sizeof (u_long));
 	strtab = NULL;
 	if	(strsize <= 8192L)
 		{
@@ -899,7 +1266,18 @@ register struct vseg *seg;
 		inistr(STRINGS);
 
 	while (Input[SYMBOLS].nsize > 0) {
+#ifdef RNL
+		{
+			struct real_nlist oo;
+			mget((int *)&oo, sizeof oo, SYMBOLS);
+			objsym.n_un.n_strx = oo.n_un.n_strx;
+			objsym.n_type = oo.n_type;
+			objsym.n_ovly = oo.n_ovly;
+			objsym.n_value = oo.n_value;
+		}
+#else
 		mget((int *)&objsym, sizeof objsym, SYMBOLS);
+#endif
 		type = objsym.n_type;
 		if (Sflag) {
 			mtype = type&037;
@@ -918,7 +1296,7 @@ register struct vseg *seg;
 */
 		if	(strtab)
 			strncpy(cursym.n_name, (int)objsym.n_un.n_strx + 
-				strtab - sizeof (long), NNAMESIZE);
+				strtab - sizeof (u_long), NNAMESIZE);
 		else
 			{
 			dseek(STRINGS, objsym.n_un.n_strx + strloc, 077777);
@@ -1222,9 +1600,11 @@ setupout()
 {
 	VADDR	vsym;
 	register SYMBOL *sp;
+	char *tmp;
 
 	tcreat(&toutb, 0);
-	mktemp(tfname);
+	/* mktemp(tfname); */
+	tfname = tempnam("/tmp/", "ld");
 	tcreat(&doutb, 1);
 	if (sflag==0 || xflag==0)
 		tcreat(&soutb, 1);
@@ -1243,7 +1623,11 @@ setupout()
 	filhdr.e.a_text = tsize;
 	filhdr.e.a_data = dsize;
 	filhdr.e.a_bss = bsize;
+#ifdef RNL
+	ssize = sflag? 0 : (ssize + (sizeof (struct real_nlist)) * symindex);
+#else
 	ssize = sflag? 0 : (ssize + (sizeof (struct nlist)) * symindex);
+#endif
 /*
  * This is an estimate, the real size is computed later and the
  * a.out header rewritten with the correct value.
@@ -1313,7 +1697,7 @@ long loc;
 	struct	nlist objsym;
 	off_t	stroff;
 	char	*strtab;
-	long	strsize;
+	u_long	strsize;
 
 	readhdr(loc);
 	ctrel = torigin;
@@ -1329,7 +1713,7 @@ long loc;
 	stroff = loc + N_STROFF(filhdr);
 
 	lseek(infil, stroff, L_SET);
-	read(infil, &strsize, sizeof (long));
+	read(infil, &strsize, sizeof (u_long));
 	strtab = NULL;
 	if	(strsize <= 8192L)
 		{
@@ -1342,10 +1726,21 @@ long loc;
 
 	while (Input[SYMBOLS].nsize > 0) {
 		symno++;
+#ifdef RNL
+		{
+			struct real_nlist oo;
+			mget((int *)&oo, sizeof oo, SYMBOLS);
+			objsym.n_un.n_strx = oo.n_un.n_strx;
+			objsym.n_type = oo.n_type;
+			objsym.n_ovly = oo.n_ovly;
+			objsym.n_value = oo.n_value;
+		}
+#else
 		mget((int *)&objsym, sizeof objsym, SYMBOLS);
+#endif
 		if	(strtab)
 			strncpy(cursym.n_name, (int)objsym.n_un.n_strx +
-				strtab - sizeof (long), NNAMESIZE);
+				strtab - sizeof (u_long), NNAMESIZE);
 		else
 			{
 			dseek(STRINGS, objsym.n_un.n_strx + stroff, 07777);
@@ -1484,9 +1879,9 @@ load2td(lp, creloc, b1, b2)
 			r = get(RELOC);
 		} else
 			r = *Input[RELOC].Iptr++;
-#ifdef __VC_
-		if (IS_A(x)) {
-			switch (REL_TYPE(r) {
+#ifdef _VC_
+		if (IS_A(r)) {
+			switch (REL_TYPE(r)) {
 			case REL_TEXT:
 				t += ctrel;
 				break;
@@ -1509,7 +1904,8 @@ load2td(lp, creloc, b1, b2)
 				r = (r&01) + ((sp->n_type-(N_EXT+N_ABS))<<1);
 				break;
 			default:
-				error(1, "relocation format botch (symbol type))");
+				if (r != 0)
+					error(1, "relocation format botch (symbol type))");
 			}
 		} else {
 			u_int r2, t1, t2, tmp;
@@ -1540,8 +1936,9 @@ load2td(lp, creloc, b1, b2)
 			} else
 				r2 = *Input[RELOC].Iptr++;
 
-			//	t = lui	R, addr
-			//	r is reloc
+			/*	t = lui	R, addr
+			**	r is reloc
+			*/
 
 			t1 = ((t&(1<<11))<<3) |
 			     ((t&(1<<12))<<2) |
@@ -1552,21 +1949,21 @@ load2td(lp, creloc, b1, b2)
 				t1 |= (t1<1)&0x8000;
 			}
 			t &= ~0x187c;
-			tmp = ((t2>>5)&0x0003) |	// add or jalr )li)
+			tmp = ((t2>>5)&0x0003) |	/* add or jalr )li) */
 			      ((t2>>8)&0x001c) |
 			      ((t2<<3)&0x00e0);
 			if (tmp&0x80)
 				tmp |= 0xff00;
 			t2 &= ~0x1c7c;
 			if (IS_B(r)) {
-				//	t2 = add R, addr
+				/*	t2 = add R, addr */
 			} else {
-				//	t2 = jalr addr(li)
+				/*	t2 = jalr addr(li) */
 				tmp &= 0xfffe;
 			}
 			t1 += tmp;
 
-			switch (REL_TYPE(r) {
+			switch (REL_TYPE(r)) {
 			case REL_TEXT:
 				t1 += ctrel;
 				break;
@@ -1594,15 +1991,15 @@ load2td(lp, creloc, b1, b2)
 
 			tmp = t1&0xff;
 			t1 &= 0xff00;
-			it (tmp&0x80)
+			if (tmp&0x80)
 				t1 += 0x100;
 			if ((t1&0xc000) == 0x4000 || (t1&0xc000) == 0x8000)
 				t |= 0x0002;
-			t |= ((t1&0x4000)>>3) |		// lui
+			t |= ((t1&0x4000)>>3) |		/* lui */
 			     ((t1&0x2000)>>1) |
 			     ((t1&0x1f00)>>6);
 
-			t2 |= ((tmp&0x0003)<<5) |	// add/jal
+			t2 |= ((tmp&0x0003)<<5) |	/* add/jal */
 			      ((tmp&0x001c)<<8) |
 			      ((tmp&0x00e0)>>3);
 			putw(t, b1);
@@ -1652,7 +2049,11 @@ finishout()
 {
 	register u_int n;
 	register SYMBOL *sp;
+#ifdef RNL
+	struct	real_nlist objsym;
+#else
 	struct	nlist objsym;
+#endif
 	VADDR	vsym;
 	int type, len;
 	off_t	stroff;
@@ -1845,7 +2246,7 @@ mkfsym(s)
 	}
 
 mget(loc, an, which)
-	register int *loc;
+	register short *loc;
 	int an, which;
 {
 	register int n;
@@ -2110,9 +2511,11 @@ tcreat(fpp, tempflg)
 	register int ufd;
 	char	*nam;
 
-	nam = (tempflg ? tfname : ofilename);
-	if	((ufd = open(nam, O_RDWR|O_CREAT|O_TRUNC, 0666)) < 0)
+	nam = (tempflg ? tfname : ofilename); 
+	if	((ufd = open(nam, O_RDWR|O_CREAT|O_TRUNC, 0666)) < 0) {
+		printf("tmp='%s'\n", nam);
 		error(2, tempflg?"cannot create temp":"cannot create output");
+	}
 	if	(tempflg)
 		unlink(tfname);
 	*fpp = fdopen(ufd, "r+");

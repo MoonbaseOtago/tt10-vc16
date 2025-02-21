@@ -19,5 +19,9 @@ start.bin:	vcasm start.s
 	./vcasm -b -m -o start.bin start.s
 
 ld:	ld.c	
-	gcc -I /home/paul/tt06/vc32/bsd/usr/include -I /home/paul/tt06/vc32/bsd/usr//sys -I /home/paul/tt06/vc32/bsd/usr//sys/h  -o ld ld.c -g
+	#gcc -std=c90 -I /home/paul/tt10/vc16/bsd/usr/include -I /home/paul/tt10/vc16/bsd/usr//sys -I /home/paul/tt10/vc16/bsd/usr//sys/h -I /home/paul/tt10/vc16/bsd/usr/bin/ar/  -o ld ld.c -g
+	gcc -D_VC_ -std=c90 -I /home/paul/tt10/vc16/bsd/usr/bin/ar/  -o ld ld.c -g
 
+install:	vcasm ld
+	cp vcasm /usr/local/bin/vc16-bsd-as
+	cp ld /usr/local/bin/vc16-bsd-ld

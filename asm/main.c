@@ -97,6 +97,7 @@ struct	nlist {
 	union {
 		unsigned short n_strx;/* String table offset (file) */
 	} n_un;
+	unsigned short filler;
 #endif
 	u_char	      n_type;	 /* Type of symbol - see below */
 	char	      n_ovly;	 /* Overlay number */
@@ -209,6 +210,7 @@ int is_short_jump(/* int label */);
 void set_file();
 void make_bss(/* int type, int name, int size */);
 
+int pass;
 
 int
 shift_exp(r)
@@ -517,6 +519,7 @@ static struct tab reserved[] = {
 	"addpc", t_addpc,
 	"align", t_align,
 	"and", t_and,
+	"ascii", t_ascii,
 	"beqz", t_beqz,
 	"beqzs", t_beqzs,
 	"bgez", t_bgez,
@@ -540,6 +543,7 @@ static struct tab reserved[] = {
 	"file", t_file,
 	"flush", t_flush,
 	"global", t_global,
+	"globl", t_global,
 	"icache", t_icache,
 	"ident", t_ident,
 	"inv", t_inv,
@@ -860,12 +864,15 @@ int ind, type, offset;
 			if (ind == np->index) {
 				unsigned offset = (seg?data_size:text_size);
 				int delta;
-				if (np->seg != seg) {
+				if (np->seg != seg && type != 10) {
 					errs++;
 					fprintf(stderr, "%d: '%db' jmp to another segment not allowed\n", line, ind);
 					return 0;
 				} 
 				delta = np->offset-offset;
+				if (type == 10) {
+					return np->offset;
+				} else
 				if (type == 6) {
 					if (delta < -(1<<10) || delta >= (1<<10)) {
 						errs++;
@@ -900,6 +907,21 @@ int ind, type, offset;
 			rp->prev = 0;
 			rp->next = num_ref_first;
 			num_ref_first = rp;
+		}
+		return 0;
+	}
+	if (type == 10) {
+		struct symbol *sp;
+		if (pass == 0)
+			return 0;
+		for (sp = list; sp; sp=sp->next) 
+		if (ind == sp->index) {
+			if (sp->type == (N_EXT|N_UNDF)) {
+				fprintf(stderr, "%d: symbol %s not found\n", line-1, sp->name);
+				errs++;	
+				return 0;
+			}
+			return sp->offset;
 		}
 		return 0;
 	}
@@ -1149,19 +1171,33 @@ char *err;
 	fprintf(stderr, "%d: %s\n", line, err);
 }
 
+unsigned char nl=1;
 int
 yylex()
 {
 	int c;
+	unsigned char last_nl = nl;
+	nl = 0;
 
 	if (eof)
 		return 0;
 	c = fgetc(fin);
+	if (last_nl && c=='/') { // bsd comments - we may want to parse line and file comments
+		for (;;) {
+			c = fgetc(fin);
+			if (c == EOF || c == '\n')
+				break;
+		}
+		line++;
+		nl = 1;
+		return t_nl;
+	}
 	while (c == ' ' || c == '\t')
 		c = fgetc(fin);
 	if (c == EOF) {
 		eof = 1;
 		line++;
+		nl = 1;
 		return t_nl;
 	} else
 	if (c == '/') {
@@ -1176,6 +1212,7 @@ yylex()
 				break;
 		}
 		line++;
+		nl = 1;
 		return t_nl;
 	} else
 	if (c == '#') {
@@ -1185,10 +1222,12 @@ yylex()
 				break;
 		}
 		line++;
+		nl = 1;
 		return t_nl;
 	} else
 	if (c == '\n') {
 		line++;
+		nl = 1;
 		return t_nl;
 	} else
 	if (c == '"') {
@@ -1363,6 +1402,7 @@ yylex()
 			if (c == '/') {		
 				while (c != '\n' && c != EOF)
 					c = fgetc(fin);
+				nl = 0;
 				return t_nl;
 			}
 			ungetc(c, fin);
@@ -1382,12 +1422,17 @@ char **argv;
 	struct num_ref *np;
 	unsigned char use_std=0;
 	char *out_name = "a.out";
-	int pass;
 
 	yydebug = 0;
 	for (i = 1; i < argc; i++) {	
 		if (strcmp(argv[i], "--") == 0) {
 			use_std = 1;
+		} else
+		if (strcmp(argv[i], "-u") == 0) {
+			// Treat all undefined symbols in the assembly as external globals.
+		} else
+		if (strcmp(argv[i], "-V") == 0) {
+			// Produce an object suitable for loading into an automatic text overlaid program.
 		} else
 		if (strcmp(argv[i], "-y") == 0) {
 			yydebug = 1;
@@ -1423,10 +1468,12 @@ char **argv;
 	}
 
 	if (!filename) {
+#ifdef NOTDEF
 		if (!use_std) {
 			fprintf(stderr, "No file specified\n");
 			return 1;
 		}
+#endif
 		fin = stdin;
 		filename = ".stdin";
 	} else {
@@ -1503,6 +1550,8 @@ char **argv;
 				break;
 			}
 			
+			if (aout && sp->type == (N_UNDF)) 	
+				sp->type |= N_EXT;
 			if ((!aout || sp->type != (N_EXT|N_UNDF)) && !sp->found) {
 notdef:
 				errs++;
@@ -1637,7 +1686,7 @@ notdef:
 				e.a_syms = 8*(nsym+1);
 				e.a_entry = 0;
 				e.a_unused = 0;
-				e.a_flag = reloc_first?0:1;
+				e.a_flag = 0;
 				if (fwrite(&e, sizeof(e), 1, fout) != 1) {
 outerr:
 					fprintf(stderr, "Error writing file '%s'\n", out_name);
@@ -1649,7 +1698,7 @@ outerr:
 				
 				if (data_size && fwrite(data, data_size, 1, fout) != 1) goto outerr;
 //printf("text reloc = %lx\n", ftell(fout));
-				if (reloc_first) {
+				if (reloc_first || 1) {
 					struct reloc *rp = reloc_first;
 					unsigned short s;
 					for (i = 0; i < text_size; i+=2) {	/* text reloc */
@@ -1748,6 +1797,7 @@ outerr:
 					}
 				}
 				fflush(fout);
+//printf("nsym = %d\n", nsym);
 //printf("text reloc end = %lx\n", ftell(fout));
 				symb_start = ftell(fout);
 				fseek(fout, ((long)nsym+1)*sizeof(n), 1);
@@ -1761,7 +1811,7 @@ outerr:
 				for (sp=list, i = 1; sp; sp=sp->next) 
 				if (sp->type&N_EXT) {
 					int l = strlen(sp->name)+1;
-					sp->soffset = i;
+					sp->soffset = string_offset;
 					string_offset += l;
 					if (fwrite(sp->name, l, 1, fout) != 1) goto outerr;
 					i++;
@@ -1773,7 +1823,7 @@ outerr:
 				fseek(fout, symb_start, 0);
 //printf("symb start = %lx\n", ftell(fout));
 				
-				n.n_un.n_strx = 0;	/* file name */
+				n.n_un.n_strx = 4;	/* file name */
 				n.n_type = N_FN;
 				n.n_ovly = 0;
 				n.n_value = 0;
