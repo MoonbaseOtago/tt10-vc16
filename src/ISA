@@ -64,12 +64,11 @@ cccc - constant (details vary to make decoding easy)
 1000 01dd dxxs ss01 - shl	rd, rd, rs
 1001 01dd dccc cc01 - shl	rd, rd, ccccc
 100c 10dd dccc cc01 - and	rd, rd, cccccc
-1000 11dd d00s ss01 - sub	rd, rd, rs
-1000 11dd d01s ss01 - xor	rd, rd, rs
+1000 11dd d0ss ss01 - sub	rd, rd, RR		
 1000 11dd d10s ss01 - or	rd, rd, rs
 1000 11dd d11s ss01 - and	rd, rd, rs
-1001 11dd d00s ss01 - subc	rd, rd, rs	add/sub with carry 	0/1
-1001 11dd d01s ss01 - addc	rd, rd, rs	carry goes to mulhi	0/-1
+1001 11dd d0ss ss01 - subc	rd, rd, RR	add/sub with carry 	0/1
+1001 11dd d1ss ss01 - addc	rd, rd, RR	carry goes to mulhi	0/-1
 101c cccc cccc cc01 - j		ccccccccccc0(pc)
 110c ccss sccc cc01 - beqz	rs, ccccccc0(pc)
 111c ccss sccc cc01 - bnez	rs, ccccccc0(pc)
@@ -104,6 +103,7 @@ cccc - constant (details vary to make decoding easy)
 1001 11dd d000 1011 - zext	rd
 1001 11dd d000 1111 - inv	rd
 1001 11dd d001 0011 - neg	rd
+1001 11dd d10s ss11 - xor	rd, rd, rs
 1001 11ss s001 1011 - flushw    (rs) *		flush write cache to mem
 101c cccc cccr rr11 - lb	rr, ccccccc(r7)		addr sign extended
 110c ccss sccc cc11 - bltz	rs, ccccccc0(pc)
