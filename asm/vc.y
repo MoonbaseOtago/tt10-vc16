@@ -81,6 +81,7 @@ ins:		t_and  rm ',' rm 	{ $$ = 0x8c61|($2<<7)|($4<<2); }
 	|	t_or  rm ',' exp	{ $$ = 0x8803|($2<<7)|imm6($4); }
 	|	t_add  t_sp ',' exp 	{ $$ = 0x6101 | addsp($4); }
 	|	t_sub  t_sp ',' exp 	{ $$ = 0x6101 | addsp(-$4); }
+	|	t_sub  t_sp ',' rm 	{ $$ = 0x9c3b | ($4<<7); }
 	|	t_add  t_sp ',' r       { $$ = 0x8002|(2<<7)|($4<<2); } 
 	|	t_add  rm ',' exp	{ $$ = 0x0001|($2<<7)|imm8($4, 0); }
 	|	t_sub  rm ',' exp	{ $$ = 0x0001|($2<<7)|imm8(-$4, 0); }

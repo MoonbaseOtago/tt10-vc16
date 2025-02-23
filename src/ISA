@@ -103,8 +103,9 @@ cccc - constant (details vary to make decoding easy)
 1001 11dd d000 1011 - zext	rd
 1001 11dd d000 1111 - inv	rd
 1001 11dd d001 0011 - neg	rd
+1001 11ss s001 0111 - flushw    (rs) *		flush write cache to mem
+1001 11ss s001 1011 - sub	sp, rs
 1001 11dd d10s ss11 - xor	rd, rd, rs
-1001 11ss s001 1011 - flushw    (rs) *		flush write cache to mem
 101c cccc cccr rr11 - lb	rr, ccccccc(r7)		addr sign extended
 110c ccss sccc cc11 - bltz	rs, ccccccc0(pc)
 111c ccss sccc cc11 - bgez	rs, ccccccc0(pc)

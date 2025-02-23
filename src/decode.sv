@@ -482,7 +482,7 @@ module decode(input clk, input reset,
 								3'b0_10:	c_op = `OP_ADDB;
 								3'b0_11:	c_op = `OP_ADDBU;
 								3'b1_00:	c_op = `OP_SWAP; // swap 
-								3'b1_01:	case (ins[4:2])
+								3'b1_01:	casez (ins[4:2])
 											3'b000: begin c_op = `OP_ADD; c_rs2_pc = 1; c_rs2 = 4'bx; end	// addpc								
 											3'b001: begin c_op = `OP_ADDB; c_rs2 = 0; end   // sext
 											3'b010: begin c_op = `OP_ADDBU; c_rs2 = 0; end   // zext
@@ -498,6 +498,7 @@ module decode(input clk, input reset,
 														c_imm = 0;
 														c_trap = !supmode;
 													end
+											3'b110: begin c_op = `OP_SUB; c_rd = 2; c_rs1 = 2; c_rs2 =  {1'b1, ins[9:7]}; end   // sub sp, r
 											default:	c_trap = 1;
 											endcase
 								3'b1_10:	c_op = `OP_XOR;
