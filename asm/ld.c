@@ -1882,6 +1882,8 @@ load2td(lp, creloc, b1, b2)
 #ifdef _VC_
 		if (IS_A(r)) {
 			switch (REL_TYPE(r)) {
+			case REL_ABS:
+				break;
 			case REL_TEXT:
 				t += ctrel;
 				break;
@@ -1904,8 +1906,9 @@ load2td(lp, creloc, b1, b2)
 				r = (r&01) + ((sp->n_type-(N_EXT+N_ABS))<<1);
 				break;
 			default:
-				if (r != 0)
+				if (r != 0) {
 					error(1, "relocation format botch (symbol type))");
+				}
 			}
 		} else {
 			u_int r2, t1, t2, tmp;
@@ -1964,6 +1967,8 @@ load2td(lp, creloc, b1, b2)
 			t1 += tmp;
 
 			switch (REL_TYPE(r)) {
+			case REL_ABS:
+				break;
 			case REL_TEXT:
 				t1 += ctrel;
 				break;

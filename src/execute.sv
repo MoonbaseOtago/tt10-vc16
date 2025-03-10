@@ -25,6 +25,7 @@ module execute(input clk, input reset,
 		input rs2_pc,
 		input rs2_inv,
 		input [RV-1:0]imm,
+		input	load_lui_hi,
 		input	load,
 		input	store,
 		input	io,
@@ -137,7 +138,7 @@ module execute(input clk, input reset,
 
 	wire sup_enabled;
 
-	wire [RV-1:0]csr = {{(RV-8){1'b0}}, user_io, 2'b00, mmu_d_proxy, mmu_enable, sup_enabled, r_prev_ie, r_ie};
+	wire [RV-1:0]csr = {{(RV-8){1'b0}}, user_io, r_prev_lui_hi, r_lui_hi,  mmu_d_proxy, mmu_enable, sup_enabled, r_prev_ie, r_ie};
 
 	always @(*)
 	if (r_wb_valid && rs1 == r_wb_addr && r_wb_addr!=0) begin
@@ -177,11 +178,12 @@ module execute(input clk, input reset,
 	end
 
 	always @(*) 
-	casez ({rs2_inv, rs2_pc, needs_rs2})  // synthesis full_case parallel_case
-	3'b10?: r2 = {RV{1'b1}};
-	3'b01?: r2 = {r_pc, 1'b0};
-	3'b000: r2 = imm;
-	3'b001: r2 = r2reg;
+	casez ({rs2_inv, rs2_pc, needs_rs2, r_lui_hi&(store|load)&cond[2]})  // synthesis full_case parallel_case
+	4'b10??: r2 = {RV{1'b1}};
+	4'b01??: r2 = {r_pc, 1'b0};
+	4'b0000: r2 = imm;
+	4'b0001: r2 = {r_mult[2*RV-1:RV+8], imm[7:0]};
+	4'b001?: r2 = r2reg;
 	default: r2 = {RV{1'bx}};
 	endcase
 	
@@ -316,6 +318,7 @@ module execute(input clk, input reset,
 	reg [RV-1:0]r_wb, c_wb;
 	reg [3:0]r_wb_addr;
 	reg r_ie;
+	reg r_lui_hi;
 	reg r_wb_valid;
 	reg r_set_cc;
 	reg r_cc;
@@ -533,6 +536,22 @@ module execute(input clk, input reset,
 		end
 	endgenerate
 
+	reg		r_prev_lui_hi, c_prev_lui_hi;
+	always @(*) begin
+		c_prev_lui_hi = r_prev_lui_hi;
+		if (reset) begin
+			c_prev_lui_hi = 0;
+		end else
+		if ((valid && !r_read_stall && (sys_trap ||  interrupt&r_ie)) | (mmu_trap&r_fetch) ) begin
+			c_prev_lui_hi = r_lui_hi;
+		end else
+		if (r_wb_valid && r_wb_addr == 4'b0100 && sup_enabled)
+			c_prev_lui_hi = r_wb[6];
+	end
+
+	always @(posedge clk)
+		r_prev_lui_hi <= c_prev_lui_hi;
+
 	reg		r_prev_ie, c_prev_ie;
 	always @(*) begin
 		c_prev_ie = r_prev_ie;
@@ -571,6 +590,7 @@ module execute(input clk, input reset,
 	always @(posedge clk) begin
 		//r_trap <= !reset && valid && (trap || interrupt&&r_ie);
 		r_ie <= reset ? 0 : (valid && (sys_trap || interrupt&&r_ie)) | (mmu_trap&r_fetch) ? 0: r_wb_valid && (r_wb_addr == 4) && sup_enabled ? r_wb[0] : valid&&jmp&&rs1==3&&sup_enabled?r_prev_ie : r_ie; 
+		r_lui_hi <= reset ? 0 : valid && load_lui_hi ? 1 : r_wb_valid && (r_wb_addr == 4) && sup_enabled ? r_wb[5] : valid&&jmp&&rs1==3&&sup_enabled?r_prev_lui_hi : valid?0: r_lui_hi; 
 		r_pc <= c_pc;
 		r_branch_stall <= !reset&valid&(jmp|br&br_taken);
 	end

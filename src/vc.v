@@ -186,6 +186,7 @@ module vc(input clk, input reset,
 	wire idone =ifetch&i_hit&!mmu_fault;
 	wire		user_io;
 	wire		set_cc;
+	wire		load_lui_hi;
 
 	decode #(.RV(RV))dec(.clk(clk), .reset(reset),
 		.supmode(supmode),
@@ -206,6 +207,7 @@ module vc(input clk, input reset,
 		.do_flush_write(do_flush_write),
 		.do_inv_mmu(do_inv_mmu),
 		.set_cc(set_cc),
+		.load_lui_hi(load_lui_hi),
 `ifdef MULT
 		.mult(mult),
 		.div(div),
@@ -250,6 +252,7 @@ module vc(input clk, input reset,
 		.do_inv_mmu(do_inv_mmu),
 		.inv_mmu(inv_mmu),
 		.set_cc(set_cc),
+		.load_lui_hi(load_lui_hi),
 `ifdef MULT
 		.mult(mult),
 		.div(div),

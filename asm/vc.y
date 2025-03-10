@@ -290,18 +290,21 @@ ins:		t_and  rm ',' rm 	{ $$ = 0x8c61|($2<<7)|($4<<2); }
 					}
 	|	t_j	t_num_label	{ $$ = 0xa001| ref_label($2, 6, 0); }
 	|	t_jal	t_num_label	{ $$ = 0x2001| ref_label($2, 6, 0); }
-	|	t_sll	rm ',' rm	{ $$ = 0x1002 | ($2<<7) | ($4<<2); }
-	|	t_sll	rm ',' exp	{ $$ = 0x0002 | ($2<<7) | shift_exp($4); }
+	|	t_sll	rm ',' rm	{ $$ = 0x9003 | ($2<<7) | ($4<<2); }
+	|	t_sll	rm ',' exp	{ $$ = 0x8003 | ($2<<7) | shift_exp($4); }
 	|	t_srl	rm ',' rm	{ $$ = 0x9001 | ($2<<7) | ($4<<2); }
 	|	t_srl	rm ',' exp 	{ $$ = 0x8001 | ($2<<7) | shift_exp($4); }
 	|	t_sra	rm ',' rm	{ $$ = 0x9401 | ($2<<7) | ($4<<2); }
 	|	t_sra	rm ',' exp	{ $$ = 0x8401 | ($2<<7) | shift_exp($4); }
 	|	t_la	rm ',' t_num_label 	{ ref_label($4, 4, 0); emit(0x6001|((8|$2)<<7)); $$ = 0x0001 | ($2<<7);  }
 	|	t_la	rm ',' t_num_label '+' exp { ref_label($4, 4, $6); emit(0x6001|((8|$2)<<7)); $$ = 0x0001 | ($2<<7); }
+	|	t_la	rm ',' t_num_label '-' exp { ref_label($4, 4, (-$6)&0xffff); emit(0x6001|((8|$2)<<7)); $$ = 0x0001 | ($2<<7); }
 	|	t_la	rm ',' t_name 	{ ref_label($4, 4, 0); emit(0x6001|((8|$2)<<7)); $$ = 0x0001 | ($2<<7);  }
 	|	t_la	rm ',' t_name '+' exp 	{ ref_label($4, 4, $6); emit(0x6001|((8|$2)<<7)); $$ = 0x0001 | ($2<<7); }
+	|	t_la	rm ',' t_name '-' exp 	{ ref_label($4, 4, (-$6)&0xffff); emit(0x6001|((8|$2)<<7)); $$ = 0x0001 | ($2<<7); }
 	|	t_la	rx ',' t_name 	{ ref_label($4, 4, 0); emit(0x6001|(($2)<<7)); $$ = 0x2002 | ($2<<7);  }
 	|	t_la	rx ',' t_name '+' exp 	{ ref_label($4, 4, $6); emit(0x6001|(($2)<<7)); $$ = 0x2002 | ($2<<7); }
+	|	t_la	rx ',' t_name '-' exp 	{ ref_label($4, 4, (-$6)&0xffff); emit(0x6001|(($2)<<7)); $$ = 0x2002 | ($2<<7); }
 	|	t_ldio r ',' exp '(' rm ')'{ $$ = 0x4003|($6<<7)|roffIO($4)|(($2&7)<<2); chkr($2); }
 	|	t_ldio r ',' '(' rm ')'	{ $$ = 0x4003|($5<<7)|roffIO(0)|(($2&7)<<2); chkr($2); }
 	|	t_stio r ',' exp '(' rm ')'{ $$ = 0x2003|($6<<7)|roffIO($4)|(($2&7)<<2); chkr($2); }
@@ -325,6 +328,7 @@ inw:		ins			{ emit($1); }
 	|	'.' t_word exp		{ emit_data(1, $3); }
 	|	'.' t_word t_name 	{ ref_label($3, 1, 0); emit_data(1, 0); }
 	|	'.' t_word t_name '+' exp { ref_label($3, 1, $5); emit_data(1, 0); }
+	|	'.' t_word t_name '-' exp { ref_label($3, 1, (-$5)&0xffff); emit_data(1, 0); }
 	|	'.' t_align exp		{ align($3); }
 	|	'.' t_align 		{ align(2); }
 	;

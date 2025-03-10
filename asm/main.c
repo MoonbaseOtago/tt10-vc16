@@ -462,6 +462,9 @@ int v;
 int luioff(v, l)
 int v, l;
 {
+	if (!bit32 && v < 0 && v > -0x8000)
+		v &= 0xffff;
+		
 	if (v&0xff || v&~0xffff) {
 		errs++;
 		fprintf(stderr, "%d: invalid constant (must be 256 byte aligned and 16 bits)\n", l?l:line);
@@ -738,7 +741,7 @@ use:
 								cp[rp->offset>>1] |=  (((delta>>1)&7)<<3) | (((delta>>4)&1)<<11) | (((delta>>5)&1)<<2) | (((delta>>6)&1)<<7) | (((delta>>7)&1)<<6) | (((delta>>8)&3)<<9)| (((delta>>10)&1)<<8) | (((delta>>11)&1)<<12);
 							}
 						} else {
-							if (delta < -(1<<6) || delta >= (1<<6)) {
+							if (delta < -(1<<8) || delta >= (1<<8)) {
 								errs++;
 								fprintf(stderr, "%d: '%df' branch too far\n", rp->line, ind);
 							} else {
@@ -882,7 +885,7 @@ int ind, type, offset;
 						return  (((delta>>1)&7)<<3) | (((delta>>4)&1)<<11) | (((delta>>5)&1)<<2) | (((delta>>6)&1)<<7) | (((delta>>7)&1)<<6) | (((delta>>8)&3)<<9)| (((delta>>10)&1)<<8) | (((delta>>11)&1)<<12);
 					}
 				} else {
-					if (delta < -(1<<6) || delta >= (1<<6)) {
+					if (delta < -(1<<8) || delta >= (1<<8)) {
 						errs++;
 						fprintf(stderr, "%d: '%db' branch too far\n", line, ind);
 						return 0;
@@ -1518,6 +1521,9 @@ char **argv;
 //fprintf(stderr, "last=%d\n", last);
 			rewind(fin);
 			eof = 0;
+			text_size = 0;
+			data_size = 0;
+			bss_size = 0;
 			if (yyparse()) {
 				return 1;
 			}
@@ -1575,7 +1581,7 @@ notdef:
 				break;
 			case 3:	/* branch */
 				delta = sp->offset-rp->offset;
-				if (delta < -(1<<6) || delta >= (1<<6)) {
+				if (delta < -(1<<8) || delta >= (1<<8)) {
 					errs++;
 					fprintf(stderr, "%d: '%s' branch too far\n", rp->line, sp->name);
 				} else {
@@ -1584,46 +1590,36 @@ notdef:
 				}
 				break;
 			case 4:	/* la lui part */
-				delta = (aout&&(sp->type == (N_EXT|N_UNDF))?0:sp->offset)+rp->extra;
-				if (sizeof(int) > 2 && delta >= (1<<15)) {
-					errs++;
-					fprintf(stderr, "%d: '%s' la too far\n", rp->line, sp->name);
+				delta = ((aout&&(sp->type == (N_EXT|N_UNDF))?0:sp->offset)+rp->extra)&0xffff;
+				if (delta&0x80) {
+					delta = (delta&~0xff)+0x100;
 				} else {
-					if (delta&0x80) {
-						delta = (delta&~0xff)+0x100;
-					} else {
-						delta = delta&~0xff;
-					}
-					t[rp->offset>>1] |= luioff(delta, rp->line);
-					/* la add part */
-					delta = ((aout&&(sp->type == (N_EXT|N_UNDF))?0:sp->offset)+rp->extra)&0xff;
-					if (delta&0x80) 
-						delta = -(0x100-delta);
-					t[(rp->offset>>1)+1] |= imm8(delta, rp->line);
+					delta = delta&~0xff;
 				}
+				t[rp->offset>>1] |= luioff(delta, rp->line);
+				/* la add part */
+				delta = ((aout&&(sp->type == (N_EXT|N_UNDF))?0:sp->offset)+rp->extra)&0xff;
+				if (delta&0x80) 
+					delta = -(0x100-delta);
+				t[(rp->offset>>1)+1] |= imm8(delta, rp->line);
 				break;
 			case 8:	/* jal lui li part */
-				delta = (aout&&(sp->type == (N_EXT|N_UNDF))?0:sp->offset)+rp->extra;
-				if (sizeof(int) > 2 && delta >= (1<<15)) {
-					errs++;
-					fprintf(stderr, "%d: '%s' la too far\n", rp->line, sp->name);
+				delta = ((aout&&(sp->type == (N_EXT|N_UNDF))?0:sp->offset)+rp->extra)&0xffff;
+				if (delta&0x80) {
+					delta = (delta&~0xff)+0x100;
 				} else {
-					if (delta&0x80) {
-						delta = (delta&~0xff)+0x100;
-					} else {
-						delta = delta&~0xff;
-					}
-					t[rp->offset>>1] |= luioff(delta, rp->line);
-					/* la jr  X(li)  part */
-					delta = ((aout&&(sp->type == (N_EXT|N_UNDF))?0:sp->offset)+rp->extra)&0xff;
-					if (delta&0x80) 
-						delta = -(0x100-delta);
-					if (delta&1) {
-						errs++;
-						fprintf(stderr, "%d: '%s' jump to odd address\n", rp->line, sp->name);
-					} else
-					t[(rp->offset>>1)+1] |= imm8(delta, rp->line);
+					delta = delta&~0xff;
 				}
+				t[rp->offset>>1] |= luioff(delta, rp->line);
+				/* la jr  X(li)  part */
+				delta = ((aout&&(sp->type == (N_EXT|N_UNDF))?0:sp->offset)+rp->extra)&0xff;
+				if (delta&0x80) 
+					delta = -(0x100-delta);
+				if (delta&1) {
+					errs++;
+					fprintf(stderr, "%d: '%s' jump to odd address\n", rp->line, sp->name);
+				} else
+				t[(rp->offset>>1)+1] |= imm8(delta, rp->line);
 				break;
 			}
 		}
