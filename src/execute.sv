@@ -587,10 +587,12 @@ module execute(input clk, input reset,
 	default:		c_pc = r_pc;
 	endcase
 
+	reg r_last_lui_hi;
 	always @(posedge clk) begin
 		//r_trap <= !reset && valid && (trap || interrupt&&r_ie);
 		r_ie <= reset ? 0 : (valid && (sys_trap || interrupt&&r_ie)) | (mmu_trap&r_fetch) ? 0: r_wb_valid && (r_wb_addr == 4) && sup_enabled ? r_wb[0] : valid&&jmp&&rs1==3&&sup_enabled?r_prev_ie : r_ie; 
-		r_lui_hi <= reset ? 0 : valid && load_lui_hi ? 1 : r_wb_valid && (r_wb_addr == 4) && sup_enabled ? r_wb[5] : valid&&jmp&&rs1==3&&sup_enabled?r_prev_lui_hi : valid?0: r_lui_hi; 
+		r_lui_hi <= reset ? 0 : (valid && (sys_trap || interrupt&&r_ie)) | (mmu_trap&r_fetch) ? 0: valid && load_lui_hi ? 1 : r_wb_valid && (r_wb_addr == 4) && sup_enabled ? r_wb[5] : valid&&jmp&&rs1==3&&sup_enabled?r_prev_lui_hi : ifetch&r_last_lui_hi?0: r_lui_hi; 
+		r_last_lui_hi <= reset ? 0 : (valid && (sys_trap || interrupt&&r_ie)) | (mmu_trap&r_fetch) ? 0 : ifetch&r_lui_hi&r_last_lui_hi? 0:valid&r_lui_hi ? 1 : r_last_lui_hi;
 		r_pc <= c_pc;
 		r_branch_stall <= !reset&valid&(jmp|br&br_taken);
 	end

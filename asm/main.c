@@ -282,9 +282,9 @@ int v;
 		return 0;
 	}
 	if (bit32) {
-		if (v < -(1<<9) || v >= (1<<9)) {
+		if (v < -(1<<8) || v >= (1<<8)) {
 			errs++;
-			fprintf(stderr, "%d: invalid offset (must be >=-512 <512)\n", line);
+			fprintf(stderr, "%d: invalid offset (must be >=-256 <256)\n", line);
 			return 0;
 		}
 		return ( (((v>>6)&1)<<5) |  (((v>>2)&1)<<6) | (((v>>3)&7)<<10)| (((v>>7)&7)<<7));
@@ -301,12 +301,12 @@ int v;
 int roff7(v)
 int v;
 {
-	if (v < -(1<<8) || v >= (1<<8)) {
+	if (v < -(1<<7) || v >= (1<<7)) {
 		errs++;
-		fprintf(stderr, "%d: invalid offset (must be >=-256 <256)\n", line);
+		fprintf(stderr, "%d: invalid offset (must be >=-128 <128)\n", line);
 		return 0;
 	}
-	return ( (((v>>0)&1)<<6) |  (((v>>1)&7)<<10) | (((v>>5)&1)<<5)| (((v>>6)&7)<<7));
+	return ( (((v>>0)&1)<<6) |  (((v>>1)&7)<<10) | (((v>>4)&1)<<5)| (((v>>5)&7)<<7));
 }
 
 int roffX(v)

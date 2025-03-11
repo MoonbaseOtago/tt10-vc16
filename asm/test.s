@@ -1120,6 +1120,48 @@ farx:	jal     sendx
 	neg	a0
 	jal	sendx	// 66
 
+// test mulhi/lb/lw/sw/sb7 extension
+
+	mv	a3, r7
+	li	r7, 0
+
+	li	a0, 0x1032
+	li	a1, 0x7788
+	sw	a1, (a0)
+
+	lw	a0, 0x1032(r7)
+	mov	a2, a0
+	mov	r7, a3
+	jal	sendx	// 88
+	swap	a0, a2
+	jal	sendx	// 77
+
+	li	r7, 0
+	li	a1, 0x1234
+	sw	a1, 0x1032(r7)
+	li	a0, 0x1032
+	lw	a0, (a0)
+
+	mov	a2, a0
+	mov	r7, a3
+	jal	sendx	// 34
+	swap	a0, a2
+	jal	sendx	// 12
+
+	li	r7, 0
+	lb	a0, 0x1032(r7)
+	mov	r7, a3
+	jal     sendx   // 34
+
+	li	r7, 0
+	li	a1, 0x1f
+	sb	a1, 0x1032(r7)
+	li	a0, 0x1032
+	lb	a0, (a0)
+	mov	r7, a3
+	jal     sendx   // 1f
+
+// need some tests for lui around exceptions
 
 	j	fail
 	

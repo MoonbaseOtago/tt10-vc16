@@ -367,7 +367,7 @@ module decode(input clk, input reset,
 					end
 			3'b101: begin 	// sb7
 						c_store = 1;
-						c_cond = 3'b0x1;
+						c_cond = 3'b1x1;
 						c_op = `OP_ADD;
 						c_rs2 = {1'b1, ins[4:2]};
 						c_rs1 = {1'b1, 3'b111};
@@ -516,7 +516,7 @@ module decode(input clk, input reset,
 			3'b101: begin 	// lb7
 						c_load = 1;
 						c_op = `OP_ADD;
-						c_cond = 3'b0x1;
+						c_cond = 3'b1x1;
 						c_rd = {1'b1, ins[4:2]};
 						c_rs1 = {1'b1, 3'b111};
 						c_imm = {{(RV-8){ins[9]}}, ins[9:7], ins[5], ins[12:10],ins[6]};
