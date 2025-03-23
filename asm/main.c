@@ -545,6 +545,7 @@ static struct tab reserved[] = {
 	"extern", t_extern,
 	"file", t_file,
 	"flush", t_flush,
+	"fp", t_fp,
 	"global", t_global,
 	"globl", t_global,
 	"icache", t_icache,
@@ -936,7 +937,7 @@ int ind, type, offset;
 	rp->seg = seg;
 	rp->extra = offset;
 	rp->index = ind;
-	rp->line = line-1;
+	rp->line = line;
 	rp->type = type;
 	rp->next = 0;
 	if (reloc_last) {
@@ -1180,10 +1181,13 @@ yylex()
 {
 	int c;
 	unsigned char last_nl = nl;
-	nl = 0;
 
 	if (eof)
 		return 0;
+	if (nl) {
+		line++;
+		nl = 0;
+	}
 	c = fgetc(fin);
 	if (last_nl && c=='/') { // bsd comments - we may want to parse line and file comments
 		for (;;) {
@@ -1191,7 +1195,6 @@ yylex()
 			if (c == EOF || c == '\n')
 				break;
 		}
-		line++;
 		nl = 1;
 		return t_nl;
 	}
@@ -1199,7 +1202,6 @@ yylex()
 		c = fgetc(fin);
 	if (c == EOF) {
 		eof = 1;
-		line++;
 		nl = 1;
 		return t_nl;
 	} else
@@ -1214,7 +1216,6 @@ yylex()
 			if (c == EOF || c == '\n')
 				break;
 		}
-		line++;
 		nl = 1;
 		return t_nl;
 	} else
@@ -1224,12 +1225,10 @@ yylex()
 			if (c == EOF || c == '\n')
 				break;
 		}
-		line++;
 		nl = 1;
 		return t_nl;
 	} else
 	if (c == '\n') {
-		line++;
 		nl = 1;
 		return t_nl;
 	} else
@@ -1501,6 +1500,7 @@ char **argv;
 		seg = 0;
 		changed = 0;
 		line = 1;
+		nl = 0;
 		if (yyparse()) {
 			return 1;
 		}
@@ -1516,6 +1516,7 @@ char **argv;
 		} else
 		if (!changed) {
 			line = 1;
+			nl = 0;
 			last = 1;
 			changed = 0;
 //fprintf(stderr, "last=%d\n", last);
