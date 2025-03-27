@@ -1,14 +1,14 @@
 .=0	
 begin:
-	js	start
+	j	start
 	.=4	
-	js	trap
+	j	trap
 	.=8
-	js 	intr
+	j 	intr
 	.=12
-	js	sys_trap
+	j	sys_trap
 	.=16
-	js	mmu_trap
+	j	mmu_trap
 mmu_vector:
 	.word	fail
 int_vector:
@@ -1074,7 +1074,7 @@ int4:	li	a0, 0
 
 
 	li	a0, 88
-far:	jalfar	fred
+far:	jal	fred
 farx:	jal     sendx
 
 

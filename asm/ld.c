@@ -502,7 +502,7 @@ int putw(int w, FILE *f) {
  *                                      word 0          word 1
  *      A       .word   address+N       N               -
  *      B       la      address+N       lui R, N        add  R, N
- *      C       j/jal   address+N       lui lr, N       j/jal N(ri)
+ *      C       br/j/jal address+N      lui mulhi, N    b/j/jal X
  *
  *      There are 3x5=15 combinations - no obvious bit encoding so we do:
  *
@@ -1841,6 +1841,9 @@ load2td(lp, creloc, b1, b2)
 	register SYMBOL *sp;
 	short	i;
 	VADDR	vsym;
+#ifdef _VC_
+	int off=0;
+#endif
 
 	for (;;) {
 /*
@@ -1994,22 +1997,29 @@ load2td(lp, creloc, b1, b2)
 				error(1, "relocation format botch (symbol type))");
 			}
 
-			tmp = t1&0xff;
-			t1 &= 0xff00;
-			if (tmp&0x80)
-				t1 += 0x100;
-			if ((t1&0xc000) == 0x4000 || (t1&0xc000) == 0x8000)
-				t |= 0x0002;
+			if (IS_B(r)) {
+				tmp = t1&0xff;
+				t1 &= 0xff00;
+				if (tmp&0x80)
+					t1 += 0x100;
+				if ((t1&0xc000) == 0x4000 || (t1&0xc000) == 0x8000)
+					t |= 0x0002;
+			} else {
+				t1 = (t1-(creloc+off+2))&0xffff;
+				tmp = t1&0xfe;
+				t1 &= 0xff00;
+			}
 			t |= ((t1&0x4000)>>3) |		/* lui */
 			     ((t1&0x2000)>>1) |
 			     ((t1&0x1f00)>>6);
-
-			t2 |= ((tmp&0x0003)<<5) |	/* add/jal */
-			      ((tmp&0x001c)<<8) |
-			      ((tmp&0x00e0)>>3);
+			t2 |= ((tmp&0x0006)<<2) |	/* add/jal */
+			      ((tmp&0x0018)<<7) |
+			      ((tmp&0x0020)>>3) |
+			      ((tmp&0x00c0)>>1);
 			putw(t, b1);
 			if (rflag)
 				putw(r, b2);
+			off +=2;
 			t = t2;
 			r = r2;
 		}
@@ -2043,6 +2053,7 @@ load2td(lp, creloc, b1, b2)
 		}
 		if (r&01)
 			t -= creloc;
+		off += 2;
 #endif
 		putw(t, b1);
 		if (rflag)

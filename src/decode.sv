@@ -37,6 +37,8 @@ module decode(input clk, input reset,
 		output do_inv_mmu, 
 		output load_lui_hi,
 		output set_cc, 
+		output use_lui_hi,
+		output [1:0]lui_hi_type,
 `ifdef MULT
 		output mult,
 		output div,
@@ -79,8 +81,12 @@ module decode(input clk, input reset,
 	reg		r_inv_mmu, c_inv_mmu; assign do_inv_mmu = r_inv_mmu;
 	reg		r_set_cc, c_set_cc; assign set_cc = r_set_cc;
 	reg		r_load_lui_hi, c_load_lui_hi; assign load_lui_hi = r_load_lui_hi;
+	reg		r_use_lui_hi, c_use_lui_hi; assign use_lui_hi = r_use_lui_hi;
+	reg[1:0]r_lui_hi_type, c_lui_hi_type; assign lui_hi_type = r_lui_hi_type;
 
 	always @(*) begin
+		c_use_lui_hi = 0;
+		c_lui_hi_type = 2'bx;
 		c_flush_all = 0;
 		c_flush_write = 0;
 		c_trap = 0;
@@ -124,18 +130,22 @@ module decode(input clk, input reset,
 			3'b001: begin 	// lw7
 						c_load = 1;
 						c_op = `OP_ADD;
-						c_cond = 3'b1x0;
+						c_cond = 3'bxx0;
 						c_rd = {1'b1, ins[4:2]};
 						c_rs1 = {1'b1, 3'b111};
+						c_use_lui_hi = 1;
+						c_lui_hi_type = 0;
 						c_imm = {{(RV-9){ins[9]}}, ins[9:7], ins[5], ins[12:10],ins[6], 1'b0};
 				    end
 			3'b010: begin 	// lw
 						c_load = 1;
 						c_op = `OP_ADD;
-						c_cond = 3'b0x0;
+						c_cond = 3'bxx0;
 						c_rd = {1'b1, ins[4:2]};
 						c_rs1 = {1'b1, ins[9:7]};
 						c_trap = ins[9:7] == 7;
+						c_use_lui_hi = 1;
+						c_lui_hi_type = 2;
 						if (RV==16) begin
 							c_imm = {{(RV-6){ins[5]}}, ins[5], ins[12:10],ins[6], 1'b0};
 						end else begin
@@ -145,31 +155,29 @@ module decode(input clk, input reset,
 			3'b011: begin 	// lb
 						c_load = 1;
 						c_op = `OP_ADD;
-						c_cond = 3'b0x1;
+						c_cond = 3'bxx1;
 						c_rd = {1'b1, ins[4:2]};
 						c_rs1 = {1'b1, ins[9:7]};
 						c_trap = ins[9:7] == 7;
+						c_use_lui_hi = 1;
+						c_lui_hi_type = 1;
 						if (RV==16) begin
 							c_imm = {{(RV-5){ins[12]}},         ins[12:10],ins[6], ins[5]};
 						end else begin
 							c_imm = {{(RV-5){ins[12]}},         ins[11:10],ins[6], ins[12], ins[5]};
 						end
 					end
-			3'b100:	begin	// jalr   x(lr)
-						c_br = 1;
-						c_cond = 3'b1x1;
-						c_op = `OP_ADD;
-						c_imm = {{(RV-8){ins[4]}}, ins[4:2],  ins[12:10], ins[6], 1'b0};
-						c_rd = 1;
-						c_rs1 = 1;
-						c_trap = (|ins[9:7])|ins[5];
+			3'b100:	begin	
+						c_trap = 1;
 					end
 			3'b101: begin 	// sw7
 						c_store = 1;
-						c_cond = 3'b1x0;
+						c_cond = 3'bxx0;
 						c_op = `OP_ADD;
 						c_rs2 = {1'b1, ins[4:2]};
 						c_rs1 = {1'b1, 3'b111};
+						c_use_lui_hi = 1;
+						c_lui_hi_type = 0;
 						if (RV==16) begin
 							c_imm = {{(RV-9){ins[9]}}, ins[9:7], ins[5], ins[12:10],ins[6], 1'b0};
 						end else begin
@@ -178,11 +186,13 @@ module decode(input clk, input reset,
 					end
 			3'b110: begin 	// sw
 						c_store = 1;
-						c_cond = 3'b0x0;
+						c_cond = 3'bxx0;
 						c_op = `OP_ADD;
 						c_rs2 = {1'b1, ins[4:2]};
 						c_rs1 = {1'b1, ins[9:7]};
 						c_trap = ins[9:7] == 7;
+						c_use_lui_hi = 1;
+						c_lui_hi_type = 2;
 						if (RV==16) begin
 							c_imm = {{(RV-6){ins[5]}}, ins[5], ins[12:10],ins[6], 1'b0};
 						end else begin
@@ -191,11 +201,13 @@ module decode(input clk, input reset,
 					end
 			3'b111: begin 	// sb
 						c_store = 1;
-						c_cond = 3'b0x1;
+						c_cond = 3'bxx1;
 						c_op = `OP_ADD;
 						c_rs2 = {1'b1, ins[4:2]};
 						c_rs1 = {1'b1, ins[9:7]};
 						c_trap = ins[9:7] == 7;
+						c_use_lui_hi = 1;
+						c_lui_hi_type = 1;
 						if (RV==16) begin
 							c_imm = {{(RV-5){ins[12]}},         ins[12:10],ins[6], ins[5]};
 						end else begin
@@ -209,13 +221,18 @@ module decode(input clk, input reset,
 						c_op = `OP_ADD;
 						c_rs1 = {1'b1, ins[9:7]};
 						c_rd = {1'b1, ins[9:7]};
+						c_use_lui_hi = 1;
+						c_lui_hi_type = 0;
 						c_imm = {{(RV-7){ins[4]}}, ins[3:2],  ins[12:10], ins[6:5]};
 					end
 			3'b001:	begin	// jal
 						c_br = 1;
 						c_cond = 3'b1x1;
 						c_op = `OP_ADD;
-						c_imm = {{(RV-11){ins[12]}}, ins[8], ins[10:9], ins[6],ins[7],ins[2],ins[11],ins[5:3],1'b0};			
+						c_use_lui_hi = 1;
+						c_lui_hi_type = 0;
+						//c_imm = {{(RV-11){ins[12]}}, ins[8], ins[10:9], ins[6],ins[7],ins[2],ins[11],ins[5:3],1'b0};			
+						c_imm = {{(RV-11){ins[12]}},ins[9:5],ins[2],ins[11:10],ins[4:3],1'b0};
 						c_rd = 1;
 						c_rs1 = 0;
 					end
@@ -229,6 +246,8 @@ module decode(input clk, input reset,
 						c_op = `OP_ADD;
 						c_rd = 2;
 						c_rs1 = 2;
+						c_use_lui_hi = 1;
+						c_lui_hi_type = 0;
 						if (RV==16) begin
 							c_imm = {{(RV-7){ins[4]}},ins[3:2],ins[12:11],ins[5],ins[6],1'b0};
 						end else begin
@@ -250,7 +269,11 @@ module decode(input clk, input reset,
 						case (ins[11:10]) // synthesis full_case parallel_case
 						2'b00: begin c_op = `OP_SRL; c_needs_rs2 = ins[12]; c_trap = !ins[12]?ins[2]:(ins[6:5]!=0); end
 						2'b01: begin c_op = `OP_SRA; c_needs_rs2 = ins[12]; c_trap = !ins[12]?ins[2]:(ins[6:5]!=0); end
-						2'b10: c_op = `OP_AND;
+						2'b10: begin
+									c_op = `OP_AND;
+									c_use_lui_hi = 1;
+									c_lui_hi_type = 1;
+							   end
 						2'b11: begin
 								c_needs_rs2 = 1;
 								casez ({ins[12],ins[6:5]}) // synthesis full_case parallel_case
@@ -282,7 +305,9 @@ module decode(input clk, input reset,
 						c_br = 1;
 						c_cond = 3'b1x0;
 						c_op = `OP_ADD;
-						c_imm = {{(RV-11){ins[12]}}, ins[8], ins[10:9], ins[6],ins[7],ins[2],ins[11],ins[5:3],1'b0};
+						c_use_lui_hi = 1;
+						c_lui_hi_type = 0;
+						c_imm = {{(RV-11){ins[12]}},ins[9:5],ins[2],ins[11:10],ins[4:3],1'b0};
 						c_rs1 = 0;
 					end
 			3'b11?:	begin	//  beqz/bnez
@@ -291,6 +316,8 @@ module decode(input clk, input reset,
 						c_op = `OP_ADD;
 						c_rs1 = {1'b1, ins[9:7]};
 						c_imm =  {{(RV-8){ins[12]}},ins[6:5],ins[2],ins[11:10],ins[4:3],1'b0};
+						c_use_lui_hi = 1;
+						c_lui_hi_type = 0;
 					end
 			default: c_trap = 1;
 			endcase
@@ -308,7 +335,7 @@ module decode(input clk, input reset,
 					end
 			3'b010:	begin	// lwsp  **
 						c_load = 1;
-						c_cond = 3'b0x0;
+						c_cond = 3'bxx0;
 						c_op = `OP_ADD;
 						c_rd = ins[10:7];
 						c_rs1 = 2;
@@ -321,7 +348,7 @@ module decode(input clk, input reset,
 					end
 			3'b011:	begin	// lbsp  **
 						c_load = 1;
-						c_cond = 3'b0x1;
+						c_cond = 3'bxx1;
 						c_op = `OP_ADD;
 						c_rd = ins[10:7];
 						c_rs1 = 2;
@@ -371,15 +398,17 @@ module decode(input clk, input reset,
 					end
 			3'b101: begin 	// sb7
 						c_store = 1;
-						c_cond = 3'b1x1;
+						c_cond = 3'bxx1;
 						c_op = `OP_ADD;
 						c_rs2 = {1'b1, ins[4:2]};
 						c_rs1 = {1'b1, 3'b111};
 						c_imm = {{(RV-8){ins[9]}}, ins[9:7], ins[5], ins[12:10],ins[6]};
+						c_use_lui_hi = 1;
+						c_lui_hi_type = 0;
 					end
 			3'b110:	begin	// swsp  **
 						c_store = 1;
-						c_cond = 3'b0x0;
+						c_cond = 3'bxx0;
 						c_rs2 = ins[10:7];
 						c_op = `OP_ADD;
 						c_rs1 = 2;
@@ -392,7 +421,7 @@ module decode(input clk, input reset,
 					end
 			3'b111:	begin	// sbsp  **
 						c_store = 1;
-						c_cond = 3'b0x1;
+						c_cond = 3'bxx1;
 						c_rs2 = ins[10:7];
 						c_rs1 = 2;
 						c_op = `OP_ADD;
@@ -467,7 +496,7 @@ module decode(input clk, input reset,
 						c_rs1 = 0;
 						c_imm = {{(RV-15){~ins[11]}}, ins[11],  ins[12], ins[6:2],8'b0};
 						c_load_lui_hi = c_rd == 4'b0111;
-						c_trap = !supmode && (c_rd >= 4'b0011 && c_rd <= 4'b0110);
+						c_trap = (!supmode && (c_rd >= 4'b0011 && c_rd <= 4'b0110)) || (c_rd == 2);
 					end
 			3'b100:	begin
 						c_rd = {1'b1, ins[9:7]};
@@ -480,7 +509,11 @@ module decode(input clk, input reset,
 									c_needs_rs2 = ins[12];
 									c_trap = !ins[12]?ins[2]:(ins[6:5]!=0);
 							   end
-						2'b10: c_op = `OP_OR;
+						2'b10: begin
+									c_op = `OP_OR;
+									c_use_lui_hi = 1;
+									c_lui_hi_type = 1;
+							   end
 						2'b11: begin
 								c_needs_rs2 = 1;
 								case ({ins[12],ins[6:5]}) // synthesis full_case parallel_case
@@ -520,9 +553,11 @@ module decode(input clk, input reset,
 			3'b101: begin 	// lb7
 						c_load = 1;
 						c_op = `OP_ADD;
-						c_cond = 3'b1x1;
+						c_cond = 3'bxx1;
 						c_rd = {1'b1, ins[4:2]};
 						c_rs1 = {1'b1, 3'b111};
+						c_use_lui_hi = 1;
+						c_lui_hi_type = 0;
 						c_imm = {{(RV-8){ins[9]}}, ins[9:7], ins[5], ins[12:10],ins[6]};
 				    end
 			3'b11?:	begin	//  bltz/bgez
@@ -531,6 +566,8 @@ module decode(input clk, input reset,
 						c_rs1 = {1'b1, ins[9:7]};
 						c_op = `OP_ADD;
 						c_imm =  {{(RV-8){ins[12]}},ins[6:5],ins[2],ins[11:10],ins[4:3],1'b0};
+						c_use_lui_hi = 1;
+						c_lui_hi_type = 0;
 					end
 			default: c_trap = 1;
 		    endcase
@@ -565,6 +602,8 @@ module decode(input clk, input reset,
 		r_inv_mmu <= c_inv_mmu;
 		r_set_cc <= c_set_cc;
 		r_load_lui_hi <= c_load_lui_hi;
+		r_use_lui_hi <= c_use_lui_hi;
+		r_lui_hi_type <= c_lui_hi_type;
 	end
 
 

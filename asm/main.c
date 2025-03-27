@@ -26,7 +26,7 @@
  *					word 0		word 1
  *	A	.word 	address+N	N		-
  *	B	la   	address+N	lui R, N	add  R, N
- *	C	j/jal   address+N	lui lr, N	j/jal N(ri)
+ *	C	j/jal   address+N	lui mulhi, N	j/jal N(ri)
  *
  *	There are 3x5=15 combinations - no obvious bit encoding so we do:
  *
@@ -524,15 +524,11 @@ static struct tab reserved[] = {
 	"and", t_and,
 	"ascii", t_ascii,
 	"beqz", t_beqz,
-	"beqzs", t_beqzs,
 	"bgez", t_bgez,
-	"bgezs", t_bgezs,
 	"bgtz", t_bgtz,
 	"blez", t_blez,
 	"bltz", t_bltz,
-	"bltzs", t_bltzs,
 	"bnez", t_bnez,
-	"bnezs", t_bnezs,
 	"bss", t_bss,
 	"byte", t_byte,
 	"comm", t_comm,
@@ -554,11 +550,8 @@ static struct tab reserved[] = {
 	"invmmu", t_invmmu,
 	"j", t_j,
 	"jal", t_jal,
-	"jalfar", t_jalfar,
 	"jalr", t_jalr,
-	"jals", t_jals,
 	"jr", t_jr,
-	"js", t_js,
  	"la", t_la,
 	"lb", t_lb,
 	"lcomm", t_lcomm,
@@ -739,7 +732,7 @@ use:
 								fprintf(stderr, "%d: '%df' jmp too far\n", rp->line, ind);
 							} else {
 								if (last)
-								cp[rp->offset>>1] |=  (((delta>>1)&7)<<3) | (((delta>>4)&1)<<11) | (((delta>>5)&1)<<2) | (((delta>>6)&1)<<7) | (((delta>>7)&1)<<6) | (((delta>>8)&3)<<9)| (((delta>>10)&1)<<8) | (((delta>>11)&1)<<12);
+									cp[rp->offset>>1] |= (((delta>>1)&3)<<3) | (((delta>>3)&3)<<10) | (((delta>>5)&1)<<2) | (((delta>>6)&0x1f)<<5) | (((delta>>11)&1)<<12);
 							}
 						} else {
 							if (delta < -(1<<8) || delta >= (1<<8)) {
@@ -883,7 +876,7 @@ int ind, type, offset;
 						fprintf(stderr, "%d: '%db' jmp too far\n", line, ind);
 						return 0;
 					} else {
-						return  (((delta>>1)&7)<<3) | (((delta>>4)&1)<<11) | (((delta>>5)&1)<<2) | (((delta>>6)&1)<<7) | (((delta>>7)&1)<<6) | (((delta>>8)&3)<<9)| (((delta>>10)&1)<<8) | (((delta>>11)&1)<<12);
+						return  (((delta>>1)&3)<<3) | (((delta>>3)&3)<<10) | (((delta>>5)&1)<<2) | (((delta>>6)&0x1f)<<5) | (((delta>>11)&1)<<12);
 					}
 				} else {
 					if (delta < -(1<<8) || delta >= (1<<8)) {
@@ -1576,7 +1569,7 @@ notdef:
 					errs++;
 					fprintf(stderr, "%d: '%s' jmp too far\n", rp->line, sp->name);
 				} else {
-					v = (((delta>>1)&7)<<3) | (((delta>>4)&1)<<11) | (((delta>>5)&1)<<2) | (((delta>>6)&1)<<7) | (((delta>>7)&1)<<6) | (((delta>>8)&3)<<9)| (((delta>>10)&1)<<8) | (((delta>>11)&1)<<12);
+					v = (((delta>>1)&3)<<3) | (((delta>>3)&3)<<10) | (((delta>>5)&1)<<2) | (((delta>>6)&0x1f)<<5) | (((delta>>11)&1)<<12);
 					t[rp->offset>>1] |= v;
 				}
 				break;
@@ -1605,22 +1598,16 @@ notdef:
 				t[(rp->offset>>1)+1] |= imm8(delta, rp->line);
 				break;
 			case 8:	/* jal lui li part */
-				delta = ((aout&&(sp->type == (N_EXT|N_UNDF))?0:sp->offset)+rp->extra)&0xffff;
-				if (delta&0x80) {
-					delta = (delta&~0xff)+0x100;
-				} else {
-					delta = delta&~0xff;
-				}
+				delta = ((aout&&(sp->type == (N_EXT|N_UNDF))?0:sp->offset-(rp->offset+2))+rp->extra)&0xffff;
+				delta = delta&~0xff;
 				t[rp->offset>>1] |= luioff(delta, rp->line);
 				/* la jr  X(li)  part */
-				delta = ((aout&&(sp->type == (N_EXT|N_UNDF))?0:sp->offset)+rp->extra)&0xff;
-				if (delta&0x80) 
-					delta = -(0x100-delta);
+				delta = ((aout&&(sp->type == (N_EXT|N_UNDF))?0:sp->offset-(rp->offset+2))+rp->extra)&0xff;
 				if (delta&1) {
 					errs++;
 					fprintf(stderr, "%d: '%s' jump to odd address\n", rp->line, sp->name);
-				} else
-				t[(rp->offset>>1)+1] |= imm8(delta, rp->line);
+				} else 
+				t[(rp->offset>>1)+1] |= (((delta>>1)&3)<<3) | (((delta>>3)&3)<<10) | (((delta>>5)&1)<<2) | (((delta>>6)&0x1f)<<5) | (((delta>>11)&1)<<12);
 				break;
 			}
 		}

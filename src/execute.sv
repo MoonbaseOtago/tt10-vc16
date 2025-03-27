@@ -26,6 +26,8 @@ module execute(input clk, input reset,
 		input rs2_inv,
 		input [RV-1:0]imm,
 		input	load_lui_hi,
+		input   use_lui_hi,
+		input[1:0]lui_hi_type,
 		input	load,
 		input	store,
 		input	io,
@@ -178,12 +180,14 @@ module execute(input clk, input reset,
 	end
 
 	always @(*) 
-	casez ({rs2_inv, rs2_pc, needs_rs2, r_lui_hi&(store|load)&cond[2]})  // synthesis full_case parallel_case
-	4'b10??: r2 = {RV{1'b1}};
-	4'b01??: r2 = {r_pc, 1'b0};
-	4'b0000: r2 = imm;
-	4'b0001: r2 = {r_mult[2*RV-1:RV+8], imm[7:0]};
-	4'b001?: r2 = r2reg;
+	casez ({rs2_inv, rs2_pc, needs_rs2, r_lui_hi&use_lui_hi, lui_hi_type})  // synthesis full_case parallel_case
+	6'b10??_??: r2 = {RV{1'b1}};
+	6'b01??_??: r2 = {r_pc, 1'b0};
+	6'b0000_??: r2 = imm;
+	6'b0001_00: r2 = {r_mult[2*RV-1:RV+8], imm[7:0]};
+	6'b0001_01: r2 = {2'b00, r_mult[2*RV-1:RV+8], imm[5:0]};
+	6'b0001_10: r2 = {1'b0, r_mult[2*RV-1:RV+8], imm[6:0]};
+	6'b001?_??: r2 = r2reg;
 	default: r2 = {RV{1'bx}};
 	endcase
 	
