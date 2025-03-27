@@ -24,7 +24,7 @@ Some instructions operate on 16 registers:
 	- 4 csr - status register *
 	- 5 mmu - mmu access register *
 	- 6 stmp - kernel mode tmp *
-	- 7 mulhi - multiply/divide extension
+	- 7 mulhi - multiply/divide extension (also used for constant extension)
 	- 8 s0
 	- 9 s1
 	- 10 a0
@@ -36,6 +36,25 @@ Some instructions operate on 16 registers:
 
 * - kernel mode only register - causes invalid instruction trap in user mode
 
+## Constant extensions
+
+Some instructions support constant extensions - if the previous instruction is a lui to mulhi then the
+constant in the subsequent instruction is extended with the 8 upper bits from the mulhi register. There
+are 3 variants (depending on the size of the original constant):
+
+CX0 - on an extended instruction only the 8 LSBs of the original constant is used, the rest are ignored.
+      The upper 8 bits come from mulhi.
+CX1 - on an extended instruction only the 6 LSBs of the original constant is used.
+      The bits 13:6 bits come from mulhi. The upper 2 bits are 00.
+CX2 - on an extended instruction only the 7 LSBs of the original constant is used (bit 0 of that is 0),
+      The bits 14:7 bits come from mulhi. The upper bit is 0.
+
+Note: CX1/2 load/store offsets (registers other than FP) are normally signed - so we support small negative offsets and (extended) karge oositive ones.
+
+The assembler will automatically extend instructions if you use large constants
+
+The CSR has 2 bits that make the pending constant extension state safe across interrupts/traps
+
 ## Instructions
 
 rd - destination register (one of the 8)
@@ -45,46 +64,46 @@ rr - destination register (one of the 16)
 RR - source register (one of the 16)
 cccc - constant (details vary to make decoding easy)
 
-000c cccc cccd dd00 - add	rd, sp, ccccccc0
-0o1c cccc cccd dd00 - lw	rd, cccccccc0(fp)	addr sign extended
-010c ccss sccd dd00 - lw	rd, ccccc0(rs)		addr sign extended
-011c ccss sccd dd00 - lb	rd, ccccc(rs)		addr sign extended
-100c cccc cccc cc00 - jal	lr, ccccccccccc0(lr)	addr sign extended
-101c cccc ccc2 2200 - sw	r2, cccccccc0(fp)	addr sign extended
-110c ccss scc2 2200 - sw	rs, ccccc0(rs2)		addr sign extended
-111c ccss scc2 2200 - sb	rs, ccccc(rs2)		addr sign extended
+000c cccc cccd dd00 - add	rd, sp, ccccccc0 				CX0
+001c ccdd dccc cc00 - lw	rd, cccccccc0(fp)	addr sign extended	CX0
+010c ccss sccd dd00 - lw	rd, ccccc0(rs)		addr sign extended	CX2
+011c ccss sccd dd00 - lb	rd, ccccc(rs)		addr sign extended	CX1
 
-000c ccdd dccc cc01 - add	rd, cccccccc
-001c ccdd dccc cc01 - jal	lr, cccccccc0(pc)
+100c ccss sccc cc00 - sw	rs, cccccccc0(0)	addr sign extended	CX0
+101c ccss sccc cc00 - sw	rs, cccccccc0(fp)	addr sign extended	CX0
+110c ccss scc2 2200 - sw	rs, ccccc0(rs2)		addr sign extended	CX2
+111c ccss scc2 2200 - sb	rs, ccccc(rs2)		addr sign extended	CX1
+
+000c ccdd dccc cc01 - add	rd, cccccccc					CX0
+001c ccdd dccc cc01 - jal	lr, cccccccc0(pc)				CX0
 010c ccdd dccc cc01 - li	rd, cccccccc
-011c crrr rccc cc01 - addi2sp	sp, sp, ccccccc0 (rr == 2)
+011c crrr rccc cc01 - addi2sp	sp, sp, ccccccc0 (rr == 2)			CX0
 		      lui	rr, ccccccc000000000 (rr!=2)
 1000 00dd dxxs ss01 - srl	rd, rd, rs
 1001 00dd dccc cc01 - srl	rd, rd, ccccc
 1000 01dd dxxs ss01 - sra	rd, rd, rs
 1001 01dd dccc cc01 - sra	rd, rd, ccccc
-100c 10dd dccc cc01 - and	rd, rd, cccccc
+100c 10dd dccc cc01 - and	rd, rd, cccccc					CX1
 1000 11dd d0ss ss01 - sub	rd, rd, RR		
 1000 11dd d10s ss01 - or	rd, rd, rs
 1000 11dd d11s ss01 - and	rd, rd, rs
 1001 11dd d0ss ss01 - subc	rd, rd, RR	add/sub with carry 	0/1
 1001 11dd d1ss ss01 - addc	rd, rd, RR	carry goes to mulhi	0/-1
-101c cccc cccc cc01 - j		ccccccccccc0(pc)
-110c ccss sccc cc01 - beqz	rs, ccccccc0(pc)
-111c ccss sccc cc01 - bnez	rs, ccccccc0(pc)
+101c cccc cccc cc01 - j		ccccccccccc0(pc)				CX0
+110c ccss sccc cc01 - beqz	rs, ccccccc0(pc)				CX0
+111c ccss sccc cc01 - bnez	rs, ccccccc0(pc)				CX0
 
-0000 ccdd dxxc cc10 - sll	rd, cccc
-0001 xxdd dxxs ss10 - sll	rd, rs
-001c ccdd dccc cc10 - addi	RX, ccccc
-010c crrr rccc cc10 - lw	rr, ccccccc0(sp)	addr 0 extended
-011c crrr rccc cc10 - lb	rr, ccccccc(sp)		addr 0 extended
+000c ccdd dccc cc10 - lw	rd, cccccccc0(0)	addr sign extended	CX0
+001c ccdd dccc cc10 - addi	RX, ccccc					CX0
+010c crdd sccc cc10 - lw	rd, ccccccc0(sp)	addr 0 extended
+101c ccdd dccc cc10 - lb	rd, cccccccc(0)		addr sign extended	CX0
 1000 xRRR R000 0010 - jr	(RR)   (jr (epc) is return from exception)
 1000 xrrr r0RR RR10 - mv	rr, RR
 1001 xRRR R000 0010 - jalr	lr, (RR)   
 1001 xrrr r0RR RR10 - add	rr, RR
-101c cccc cccr rr10 - sb	rr, ccccccc(r7)		addr sign extended
-110c cRRR Rccc cc10 - sw	RR, ccccccc0(sp)	addr 0 extended
-111c cRRR Rccc cc10 - sb	RR, ccccccc(sp)		addr 0 extended
+101c ccss sccc cc10 - sb	rs, cccccccc(fp)	addr sign extended	CX0
+110c cRRR Rccc cc10 - sw	RR, ccccccc0(sp)	addr 0 extended		
+111c ccss sccc cc10 - sb	rs, cccccccc(0)		addr sign extended	CX0
 
 0000 0000 0000 xx11 - trap	(invalid instructions   ....0111 is breakpoint)
 0000 0000 0001 0111 - syscall	
@@ -96,7 +115,7 @@ cccc - constant (details vary to make decoding easy)
 011c crrr rccc cc11 - lui	rr, ccccccc000000000 (not inverted sign extensikon)
 1000 00dd dxxs ss11 - sll	rd, rd, rs
 1001 00dd dccc cc11 - sll	rd, rd, ccccc
-100c 10dd dccc cc11 - or	rd, cccccc
+100c 10dd dccc cc11 - or	rd, cccccc					CX1
 1000 11dd d00s ss11 - mul	rd, rd, rs		(hi result in multhi)
 1000 11dd d01s ss11 - div	rd, rd, rs		(remainder in multhi)
 1000 11dd d10s ss11 - addb	rd, rd, rs		
@@ -109,9 +128,9 @@ cccc - constant (details vary to make decoding easy)
 1001 11ss s001 0111 - flushw    (rs) *		flush write cache to mem
 1001 11ss s001 1011 - sub	sp, rs
 1001 11dd d10s ss11 - xor	rd, rd, rs
-101c cccc cccr rr11 - lb	rr, ccccccc(r7)		addr sign extended
-110c ccss sccc cc11 - bltz	rs, ccccccc0(pc)
-111c ccss sccc cc11 - bgez	rs, ccccccc0(pc)
+101c ccdd sccc rr11 - lb	rd, cccccccc(fp)	addr sign extended	CX0
+110c ccss sccc cc11 - bltz	rs, ccccccc0(pc)				CX0
+111c ccss sccc cc11 - bgez	rs, ccccccc0(pc)				CX0
 
 Instructions marked '*' trap when executed in user mode
 
@@ -205,7 +224,9 @@ might look like:
 * sw 	s1, 18(sp)
 * sw 	lr, 20(sp)
 * sw 	mulhi, 22(sp)
+* sw 	csr, 22(sp)
 * jal	c_code
+* lw	csr, (sp)
 * lw	epc, (sp)
 * lw 	stmp, 2(sp)
 * lw 	a0, 4(sp)

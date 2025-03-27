@@ -1129,7 +1129,7 @@ farx:	jal     sendx
 	li	a1, 0x7788
 	sw	a1, (a0)
 
-	lw	a0, 0x1032(r7)
+uux:	lw	a0, 0x1032(r7)
 	mov	a2, a0
 	mov	r7, a3
 	jal	sendx	// 88

@@ -309,6 +309,33 @@ int v;
 	return ( (((v>>0)&1)<<6) |  (((v>>1)&7)<<10) | (((v>>4)&1)<<5)| (((v>>5)&7)<<7));
 }
 
+int pack_label(v, mask, type)
+int v;
+int mask;
+int type;
+{
+	if (!(mask&1)) {
+		if (v&1) {
+			errs++;
+			fprintf(stderr, "%d: invalid offset (must be word aligned)\n", line);
+			return 0;
+		}
+		v &= mask;
+		if (type) {
+			return ((((v>>1)&3)<<3) | (((v>>3)&3)<<10) | (((v>>5)&1)<<2) | (((v>>6)&0x3)<<5) | (((v>>8)&1)<<12));
+		} else {
+			return ((((v>>1)&3)<<3) | (((v>>3)&3)<<10) | (((v>>5)&1)<<2) | (((v>>6)&0x1f)<<5) | (((v>>11)&1)<<12));
+		}
+	} else {
+		v &= mask;
+		if (type) {
+			return ((((v>>1)&3)<<3) | (((v>>3)&3)<<10) | (((v>>5)&1)<<2) | (((v>>6)&0x3)<<5) | (((v>>0)&1)<<12));
+		} else {
+			return ((((v>>1)&3)<<3) | (((v>>3)&3)<<10) | (((v>>5)&1)<<2) | (((v>>6)&0xf)<<5) | (((v>>0)&1)<<12));
+		}
+	}
+}
+
 int roffX(v)
 int v;
 {
@@ -1609,6 +1636,30 @@ notdef:
 				} else 
 				t[(rp->offset>>1)+1] |= (((delta>>1)&3)<<3) | (((delta>>3)&3)<<10) | (((delta>>5)&1)<<2) | (((delta>>6)&0x1f)<<5) | (((delta>>11)&1)<<12);
 				break;
+			case 10:/* lw/sw  name  lui li part */
+				delta = ((aout&&(sp->type == (N_EXT|N_UNDF))?0:sp->offset)+rp->extra)&0xffff;
+				delta = delta&~0xff;
+				t[rp->offset>>1] |= luioff(delta, rp->line);
+				/* la jr  X(li)  part */
+				delta = ((aout&&(sp->type == (N_EXT|N_UNDF))?0:sp->offset)+rp->extra)&0xff;
+				if (delta&1) {
+					errs++;
+					fprintf(stderr, "%d: '%s' lw/sw to odd address\n", rp->line, sp->name);
+				} else 
+				t[(rp->offset>>1)+1] |= pack_label(delta, 0xfe, 1);
+				break;
+			case 11:/* lb/sb  name  lui li part */
+				delta = ((aout&&(sp->type == (N_EXT|N_UNDF))?0:sp->offset)+rp->extra)&0xffff;
+				delta = delta&~0xff;
+				t[rp->offset>>1] |= luioff(delta, rp->line);
+				/* la jr  X(li)  part */
+				delta = ((aout&&(sp->type == (N_EXT|N_UNDF))?0:sp->offset)+rp->extra)&0xff;
+				if (delta&1) {
+					errs++;
+					fprintf(stderr, "%d: '%s' lw/sw to odd address\n", rp->line, sp->name);
+				} else 
+				t[(rp->offset>>1)+1] |= pack_label(delta, 0xff, 1);
+				break;
 			}
 		}
 
@@ -1716,6 +1767,8 @@ outerr:
 									}
 									break;
 								case 8:	/* jal li, addr */
+								case 10:
+								case 11:
 									if (sp->type == (N_EXT|N_UNDF)) {
 										s = MAKE_REL(sp->toffset, REL_C, REL_EXTERN); 
 									} else {
@@ -1764,6 +1817,8 @@ outerr:
 									}
 									break;
 								case 8:	/* jal li, addr */
+								case 10:
+								case 11:
 									if (sp->type == (N_EXT|N_UNDF)) {
 										s = MAKE_REL(sp->toffset, REL_C, REL_EXTERN); 
 									} else {
