@@ -290,15 +290,15 @@ b12:				// should be 12
 	li	s0, 3
 	li	s1, 8
 	mul	s0, s1
+	mv	a3, mulhi
 	mv	a0, s0
 	jal     send            // 24
 	swap	a0, s0
 	jal     send            // 00
 
-	mv	s0, mulhi
-	mv	a0, s0
+	mv	a0, a3
 	jal     send            // 00
-	swap	a0, s0
+	swap	a0, a3
 	jal     send            // 00
 
 
@@ -306,16 +306,16 @@ b12:				// should be 12
 	li	s0, -1
 	mv	s1, s0
 	mul	s0, s1
+	mv	a3, mulhi
 	mv	a0, s0
 	jal     send            // 01
 	swap	a0, s0
 	jal     send            // 00
 
 
-	mv	s0, mulhi
-	mv	a0, s0
+	mv	a0, a3
 	jal     send            // fe
-	swap	a0, s0
+	swap	a0, a3
 	jal     send            // ff
 
 
@@ -323,15 +323,15 @@ b12:				// should be 12
 	li	s0, 0
 	mv	s1, s0
 	mul	s0, s1
+	mv	a3, mulhi
 	mv	a0, s0
 	jal     send            // 00
 	swap	a0, s0
 	jal     send            // 00
 
-	mv	s0, mulhi
-	mv	a0, s0
+	mv	a0, a3
 	jal     send            // 00
-	swap	a0, s0
+	swap	a0, a3
 	jal     send            // 00
 
 
@@ -658,28 +658,28 @@ faddr:	addpc	a0
 	li	a1, 20
 	li	a0, 3
 	div	a1, a0
+	mv	a3, mulhi
 	jal	send 	// 3
 	mov	a0, a1	
 	jal	send 	// 6
 	swap	a0, a1
 	jal	send 	// 0
-	mv	a1, mulhi
-	mov	a0, a1	
+	mov	a0, a3	
 	jal	send 	// 2
-	swap	a0, a1
+	swap	a0, a3
 	jal	send 	// 0
 
 	li	a1, 65534
 	li	a0, 3
 	div	a1, a0
+	mv	a3, mulhi
 	mov	a0, a1	
 	jal	sendx 	// 0x54
 	swap	a0, a1
 	jal	sendx 	// 0x55
-	mv	a1, mulhi
-	mov	a0, a1	
+	mov	a0, a3	
 	jal	sendx 	// 2
-	swap	a0, a1
+	swap	a0, a3
 	jal	sendx 	// 0
 	j	ffff
 
@@ -700,14 +700,14 @@ ffff:
 	li	a1, 65534
 	li	a0, 0x5555
 	div	a1, a0
+	mv	a3, mulhi
 	mov	a0, a1	
 	jal	sendx 	// 0x02
 	swap	a0, a1
 	jal	sendx 	// 0x00
-	mv	a1, mulhi
-	mov	a0, a1	
+	mov	a0, a3	
 	jal	sendx 	// 54
-	swap	a0, a1
+	swap	a0, a3
 	jal	sendx 	// 55
 
 // some more shift testing
@@ -1082,33 +1082,37 @@ farx:	jal     sendx
 	li	a0, 0x7fff
 	li	a1, 0x7fff
 	addc	a0, a1
+	mv	a3, mulhi
 	jal	sendx	// 0xfe
 	li	a0, 0
-	add	a0, mulhi
+	add	a0, a3
 	jal	sendx	// 0x00
 
 	li	a0, 0x8000
 	li	a1, 0x8000
 	addc	a0, a1
+	mv	a3, mulhi
 	jal	sendx	// 0x00
 	li	a0, 0
-	add	a0, mulhi
+	add	a0, a3
 	jal	sendx	// 0x01
 
 	li	a0, 0x0002
 	li	a1, 0x0001
 	subc	a0, a1
+	mv	a3, mulhi
 	jal	sendx	// 0x01
 	li	a0, 0
-	add	a0, mulhi
+	add	a0, a3
 	jal	sendx	// 0x00
 
 	li	a0, 0x0001
 	li	a1, 0x0002
 	subc	a0, a1
+	mv	a3, mulhi
 	jal	sendx	// 0xff
 	li	a0, 0
-	add	a0, mulhi
+	add	a0, a3
 	jal	sendx	// 0xff
 
 	li	a0, 0x55
@@ -1125,11 +1129,11 @@ farx:	jal     sendx
 	mv	a3, r7
 	li	r7, 0
 
-	li	a0, 0x1032
+	li	a0, 0x1832
 	li	a1, 0x7788
 	sw	a1, (a0)
 
-uux:	lw	a0, 0x1032(r7)
+	lw	a0, 0x1832(r7)
 	mov	a2, a0
 	mov	r7, a3
 	jal	sendx	// 88
@@ -1138,8 +1142,8 @@ uux:	lw	a0, 0x1032(r7)
 
 	li	r7, 0
 	li	a1, 0x1234
-	sw	a1, 0x1032(r7)
-	li	a0, 0x1032
+	sw	a1, 0x1832(r7)
+	li	a0, 0x1832
 	lw	a0, (a0)
 
 	mov	a2, a0
@@ -1149,17 +1153,100 @@ uux:	lw	a0, 0x1032(r7)
 	jal	sendx	// 12
 
 	li	r7, 0
-	lb	a0, 0x1032(r7)
+	lb	a0, 0x1832(r7)
 	mov	r7, a3
 	jal     sendx   // 34
 
 	li	r7, 0
 	li	a1, 0x1f
-	sb	a1, 0x1032(r7)
-	li	a0, 0x1032
+	sb	a1, 0x1832(r7)
+	li	a0, 0x1832
 	lb	a0, (a0)
 	mov	r7, a3
 	jal     sendx   // 1f
+
+# test extensions of other load/stores
+
+	li	a0, 0x1834
+	li	a1, 0x7788
+	sw	a1, (a0)
+	li	a3, 0
+
+	lw	a0, 0x1834(a3)
+	mov	a2, a0
+	jal	sendx	// 88
+	swap	a0, a2
+	jal	sendx	// 77
+
+	li	a1, 0x1234
+	sw	a1, 0x1834(a3)
+	li	a0, 0x1834
+	lw	a0, (a0)
+
+	mov	a2, a0
+	jal	sendx	// 34
+	swap	a0, a2
+	jal	sendx	// 12
+
+	lb	a0, 0x1834(a3)
+	jal     sendx   // 34
+
+	li	a1, 0x1f
+	sb	a1, 0x1834(a3)
+	li	a0, 0x1834
+	lb	a0, (a0)
+	jal     sendx   // 1f
+
+# test extensions of abs loads/stores
+
+	li	a0, 0x1836
+	li	a1, 0x7788
+	sw	a1, (a0)
+	li	a3, 0
+
+uux:	lw	a0, 0x1836
+	mov	a2, a0
+	jal	sendx	// 88
+	swap	a0, a2
+	jal	sendx	// 77
+
+	li	a1, 0x1234
+	sw	a1, 0x1836
+	li	a0, 0x1836
+	lw	a0, (a0)
+
+	mov	a2, a0
+	jal	sendx	// 34
+	swap	a0, a2
+	jal	sendx	// 12
+
+	lb	a0, 0x1837
+	jal     sendx   // 12
+
+	li	a1, 0x1f
+	sb	a1, 0x1837
+	li	a0, 0x1837
+	lb	a0, (a0)
+	jal     sendx   // 1f
+
+# test or/and long constants
+
+	li	a3, 0
+	or	a3, 0x1555
+	mov	a0, a3
+	jal     sendx   // 55
+	swap	a0, a3
+	jal     sendx   // 15
+
+	li	a3, 0xffff
+	and	a3, 0x2aaa
+	mov	a0, a3
+	jal     sendx   // aa
+	swap	a0, a3
+	jal     sendx   // 2a
+
+
+
 
 // need some tests for lui around exceptions
 

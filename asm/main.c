@@ -212,6 +212,14 @@ void make_bss(/* int type, int name, int size */);
 
 int pass;
 
+void
+emit_err(cp)
+char *cp;
+{
+	errs++;
+	fprintf(stderr, "%d: %s\n", line, cp);
+}
+
 int
 shift_exp(r)
 int r;

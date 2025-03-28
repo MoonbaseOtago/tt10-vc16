@@ -78,16 +78,90 @@ ins:		t_and  rm ',' rm 	{ $$ = 0x8c61|($2<<7)|($4<<2); }
 	|	t_sub  rm ',' r         { $$ = 0x8c01|($2<<7)|($4<<2); } 
 	|	t_subc  rm ',' r        { $$ = 0x9c01|($2<<7)|($4<<2); } 
 	|	t_addc  rm ',' r        { $$ = 0x9c41|($2<<7)|($4<<2); } 
-	|	t_and  rm ',' exp	{ $$ = 0x8801|($2<<7)|imm6($4); }
-	|	t_or  rm ',' exp	{ $$ = 0x8803|($2<<7)|imm6($4); }
-	|	t_add  t_sp ',' exp 	{ $$ = 0x6101 | addsp($4); }
-	|	t_sub  t_sp ',' exp 	{ $$ = 0x6101 | addsp(-$4); }
+	|	t_and  rm ',' exp	{
+						if ($4 >= 0 && $4 < (1<<6)) {
+							$$ = 0x8801|($2<<7)|imm6($4);
+						} else
+						if ($4 >= 0 && $4 < (1<<14)) {
+							emit(0x6001 | ((7)<<7) | luioff(($4<<2)&0xff00,0));
+							$$ = 0x8801|($2<<7)|imm6($4&0x3f);
+						} else {
+							emit_err("constant must be 14 bits");
+							$$ = 0;
+						}
+					}
+	|	t_or  rm ',' exp	{
+						if ($4 >= 0 && $4 < (1<<6)) {
+							$$ = 0x8803|($2<<7)|imm6($4);
+						} else
+						if ($4 >= 0 && $4 < (1<<14)) {
+							emit(0x6001 | ((7)<<7) | luioff(($4<<2)&0xff00,0));
+							$$ = 0x8803|($2<<7)|imm6($4&0x3f);
+						} else {
+							emit_err("constant must be 14 bits");
+							$$ = 0;
+						}
+					}
+	|	t_add  t_sp ',' exp 	{	
+						if ($4 >= -128 && $4 < 128) {
+							$$ = 0x6101 | addsp($4);
+						} else {
+							int v = $4;
+							emit(0x6001 | ((7)<<7) | luioff(v&0xff00, 0));
+							v &= 0xff;
+							if (v&0x80)
+							 	v |= ~0xff;
+							$$ = 0x6101 | addsp(v);
+						}
+					}
+	|	t_sub  t_sp ',' exp 	{
+						int v = -$4;
+						if ($4 >= -128 && $4 < 128) {
+							$$ = 0x6101 | addsp($4);
+						} else {
+							emit(0x6001 | ((7)<<7) | luioff(v&0xff00,0));
+							v &= 0xff;
+							if (v&0x80)
+							 	v |= ~0xff;
+							$$ = 0x6101 | addsp(v);
+						}
+					}
 	|	t_sub  t_sp ',' rm 	{ $$ = 0x9c3b | ($4<<7); }
 	|	t_add  t_sp ',' r       { $$ = 0x8002|(2<<7)|($4<<2); } 
-	|	t_add  rm ',' exp	{ $$ = 0x0001|($2<<7)|imm8($4, 0); }
-	|	t_sub  rm ',' exp	{ $$ = 0x0001|($2<<7)|imm8(-$4, 0); }
-	|	t_add  rx ',' exp	{ $$ = 0x2002|($2<<7)|imm8($4, 0); }
-	|	t_sub  rx ',' exp	{ $$ = 0x2002|($2<<7)|imm8(-$4, 0); }
+	|	t_add  rm ',' exp	{
+						if ($4 >= -128 && $4 < 128) {
+							$$ = 0x0001|($2<<7)|imm8($4, 0);
+						} else {
+							emit(0x6001 | ((7)<<7) | luioff($4&0xff00,0));
+							$$ = 0x0001|($2<<7)|imm8($4&0xff, 0);
+						}
+					}
+	|	t_sub  rm ',' exp	{ 
+						int x = -$4;
+						if (x >= -128 && x < 128) {
+							$$ = 0x0001|($2<<7)|imm8(x, 0);
+						} else {
+							emit(0x6001 | ((7)<<7) | luioff(x&0xff00,0));
+							$$ = 0x0001|($2<<7)|imm8(x&0xff, 0);
+						}
+					}
+	|	t_add  rx ',' exp	{
+						if ($4 >= -128 && $4 < 128) {
+							$$ = 0x0001|($2<<7)|imm8($4, 0);
+						} else {
+							emit(0x6001 | ((7)<<7) | luioff($4&0xff00,0));
+							$$ = 0x0001|($2<<7)|imm8($4&0xff, 0);
+						}
+					}
+	|	t_sub  rx ',' exp	{
+						int x = -$4;
+						if (x >= -128 && x < 128) {
+							$$ = 0x0001|($2<<7)|imm8(x, 0);
+						} else {
+							emit(0x6001 | ((7)<<7) | luioff(x&0xff00,0));
+							$$ = 0x0001|($2<<7)|imm8(x&0xff, 0);
+						}
+					}
 	|	t_add  rm ',' r        	{ $$ = 0x9002|((8|$2)<<7)|($4<<2); } 
 	|	t_add  rx ',' r        	{ $$ = 0x9002|($2<<7)|($4<<2); } 
 	|	t_mv   r ',' r        	{ $$ = 0x8002|($2<<7)|($4<<2); } 
@@ -106,32 +180,32 @@ ins:		t_and  rm ',' rm 	{ $$ = 0x8c61|($2<<7)|($4<<2); }
 						chkr($2);
 						ref_label($4, 10, 0);
 						emit(0x6001 | ((7)<<7));
-						$$ = 0x0002|($2<<7);
+						$$ = 0x0002|(($2&7)<<7);
 				        }
 	|	t_lw r ',' exp		{ if ($4 >= -256 && $4 < 256) {
-						$$ = 0x0002|($2<<7)|pack_label($4, 0x1fe, 1); chkr($2);
+						$$ = 0x0002|(($2&7)<<7)|pack_label($4, 0x1fe, 1); chkr($2);
 					  } else {
-						emit(0x6001 | ((7)<<7) | luioff($4&~0xff,0));
-						$$ = 0x0002|($2<<7)|pack_label($4, 0xfe, 1); chkr($2);
+						emit(0x6001 | ((7)<<7) | luioff($4&0xff00,0));
+						$$ = 0x0002|(($2&7)<<7)|pack_label($4, 0xfe, 1); chkr($2);
 					  }
 				        }
 	|	t_lb r ',' t_name	{ 
 						chkr($2);
 						ref_label($4, 11, 0);
 						emit(0x6001 | ((7)<<7));
-						$$ = 0xa002|($2<<7);
+						$$ = 0x6002|(($2&7)<<7);
 				        }
 	|	t_lb r ',' exp		{ if ($4 >= -128 && $4 < 128) {
-						$$ = 0x0002|($2<<7)|pack_label($4, 0xff, 1); chkr($2);
+						$$ = 0x6002|(($2&7)<<7)|pack_label($4, 0xff, 1); chkr($2);
 					  } else {
-						emit(0x6001 | ((7)<<7) | luioff($4&~0xff,0));
-						$$ = 0x0002|($2<<7)|pack_label($4, 0xff, 1); chkr($2);
+						emit(0x6001 | ((7)<<7) | luioff($4&0xff00,0));
+						$$ = 0x6002|(($2&7)<<7)|pack_label($4, 0xff, 1); chkr($2);
 					  }
 					}
 	|	t_lw r ',' exp '(' rm ')'{ if ($6 == 7) {
 						if ($4 <= -256 || $4 > 256) {
 							int x = $4;
-							emit(0x6001 | ((7)<<7) | luioff(x&~0xff,0));
+							emit(0x6001 | ((7)<<7) | luioff($4&0xff00,0));
 							x &= 0xff;
 							if (x&0x80)
 								x |= 0xffffff00;
@@ -140,7 +214,21 @@ ins:		t_and  rm ',' rm 	{ $$ = 0x8c61|($2<<7)|($4<<2); }
 							$$ = 0x2000|pack_label($4, 0x1fe, 1)|(($2&7)<<7); chkr($2); 
 						}
 					 } else {
-						$$ = 0x4000|($6<<7)|roffX($4)|(($2&7)<<2); chkr($2); 
+						if ($4 >= -(1<<5) && $4 < (1<<5)) {
+							$$ = 0x4000|($6<<7)|roffX($4)|(($2&7)<<2); chkr($2);
+						} else
+						if ($4 > 0 && $4 < (1<<13)) {
+							int v;
+
+							emit(0x6001 | ((7)<<7) | luioff(($4<<2)&0xff00,0));
+							v = $4&0x3f;
+							if (v&(1<<5))
+								v |= (~0)<<5;
+							$$ = 0x4000|($6<<7)|roffX(v)|(($2&7)<<2); chkr($2);
+						} else {
+							emit_err("constant must be >= -32 and < 32768");
+							$$ = 0;
+						}
 					}}
 	|	t_lw r ',' '(' rm ')'	{ if ($5==7) {
 						$$ = 0x2000|pack_label(0, 0x1fe, 1)|(($2&7)<<7); chkr($2); 
@@ -150,7 +238,7 @@ ins:		t_and  rm ',' rm 	{ $$ = 0x8c61|($2<<7)|($4<<2); }
 	|	t_lb r ',' exp '(' rm ')'{ if ($6==7) { 
 						if ($4 <= -128 || $4 > 128) {
 							int x = $4;
-							emit(0x6001 | ((7)<<7) | luioff(x&~0xff,0));
+							emit(0x6001 | ((7)<<7) | luioff(x&0xff00,0));
 							x &= 0xff;
 							if (x&0x80)
 								x |= 0xffffff00;
@@ -159,7 +247,21 @@ ins:		t_and  rm ',' rm 	{ $$ = 0x8c61|($2<<7)|($4<<2); }
 							$$ = 0xa003|pack_label($4, 0xff, 1)|(($2&7)<<7); chkr($2); 
 						}
 					 } else {
-						$$ = 0x6000|($6<<7)|roff($4)|(($2&7)<<2); chkr($2); 
+						if ($4 >= -(1<<4) && $4 < (1<<4)) {
+							$$ = 0x6000|($6<<7)|roff($4)|(($2&7)<<2); chkr($2);
+						} else
+						if ($4 > 0 && $4 < (1<<13)) {
+							int v;
+
+							emit(0x6001 | ((7)<<7) | luioff(($4<<3)&0xff00,0));
+							v = $4&0x1f;
+							if (v&(1<<4))
+								v |= (~0)<<4;
+							$$ = 0x6000|($6<<7)|roff(v)|(($2&7)<<2); chkr($2);
+						} else {
+							emit_err("constant must be >= -16 and < 16384");
+							$$ = 0;
+						}
 					 }}
 	|	t_lb r ',' '(' rm ')'	{ if ($5==7) {
 						 $$ = 0xa003|pack_label(0, 0xff, 1)|(($2&7)<<7); chkr($2);
@@ -172,32 +274,32 @@ ins:		t_and  rm ',' rm 	{ $$ = 0x8c61|($2<<7)|($4<<2); }
 						chkr($2);
 						ref_label($4, 10, 0);
 						emit(0x6001 | ((7)<<7));
-						$$ = 0x8000|($2<<7);
+						$$ = 0x8000|(($2&7)<<7);
 				        }
 	|	t_sw r ',' exp		{ if ($4 >= -256 && $4 < 256) {
-						$$ = 0x8000|($2<<7)|pack_label($4, 0x1fe, 1); chkr($2);
+						$$ = 0x8000|(($2&7)<<7)|pack_label($4, 0x1fe, 1); chkr($2);
 					  } else {
-						emit(0x6001 | ((7)<<7) | luioff($4&~0xff,0));
-						$$ = 0x8000|($2<<7)|pack_label($4, 0xfe, 1); chkr($2);
+						emit(0x6001 | ((7)<<7) | luioff($4&0xff00,0));
+						$$ = 0x8000|(($2&7)<<7)|pack_label($4, 0xfe, 1); chkr($2);
 					  }
 					}
 	|	t_sb r ',' t_name	{ 
 						chkr($2);
 						ref_label($4, 11, 0);
 						emit(0x6001 | ((7)<<7));
-						$$ = 0xe002|($2<<7);
+						$$ = 0xe002|(($2&7)<<7);
 				        }
 	|	t_sb r ',' exp		{ if ($4 >= -128 && $4 < 128) {
-						$$ = 0xe002|($2<<7)|pack_label($4, 0xff, 1); chkr($2);
+						$$ = 0xe002|(($2&7)<<7)|pack_label($4, 0xff, 1); chkr($2);
 					  } else {
-						emit(0x6001 | ((7)<<7) | luioff($4&~0xff,0));
-						$$ = 0xe002|($2<<7)|pack_label($4, 0xff, 1); chkr($2);
+						emit(0x6001 | ((7)<<7) | luioff($4&0xff00,0));
+						$$ = 0xe002|(($2&7)<<7)|pack_label($4, 0xff, 1); chkr($2);
 					  }
 					}
 	|	t_sw r ',' exp '(' rm ')'{ if ($6 == 7) {
 						if ($4 <= -256 || $4 > 256) {
 							int x = $4;
-							emit(0x6001 | ((7)<<7) | luioff(x&~0xff,0));
+							emit(0x6001 | ((7)<<7) | luioff(x&0xff00,0));
 							x &= 0xff;
 							if (x&0x80)
 								x |= 0xffffff00;
@@ -206,7 +308,21 @@ ins:		t_and  rm ',' rm 	{ $$ = 0x8c61|($2<<7)|($4<<2); }
 							$$ = 0xa000|pack_label($4, 0x1fe, 1)|(($2&7)<<7); chkr($2);
 						}
 					   } else {
-						$$ = 0xc000|($6<<7)|roffX($4)|(($2&7)<<2); chkr($2);
+						if ($4 >= -(1<<5) && $4 < (1<<5)) {
+							$$ = 0xc000|($6<<7)|roffX($4)|(($2&7)<<2); chkr($2);
+						} else
+						if ($4 > 0 && $4 < (1<<13)) {
+							int v;
+
+							emit(0x6001 | ((7)<<7) | luioff(($4<<2)&0xff00,0));
+							v = $4&0x3f;
+							if (v&(1<<5))
+								v |= (~0)<<5;
+							$$ = 0xc000|($6<<7)|roffX(v)|(($2&7)<<2); chkr($2);
+						} else {
+							emit_err("constant must be >= -32 and < 32768");
+							$$ = 0;
+						}
 					  }}
 	|	t_sw r ',' '(' rm ')'	{ if ($5 == 7) {
 						$$ = 0xa000|(($2&7)<<7); chkr($2);
@@ -216,7 +332,7 @@ ins:		t_and  rm ',' rm 	{ $$ = 0x8c61|($2<<7)|($4<<2); }
 	|	t_sb r ',' exp '(' rm ')'{ if ($6 == 7) {
 						if ($4 <= -128 || $4 > 128) {
 							int x = $4;
-							emit(0x6001 | ((7)<<7) | luioff(x&~0xff,0));
+							emit(0x6001 | ((7)<<7) | luioff(x&0xff00,0));
 							x &= 0xff;
 							if (x&0x80)
 								x |= 0xffffff00;
@@ -225,7 +341,21 @@ ins:		t_and  rm ',' rm 	{ $$ = 0x8c61|($2<<7)|($4<<2); }
 							$$ = 0xa002|pack_label($4, 0xff, 1)|(($2&7)<<7); chkr($2);
 						}
 					    } else {
-						$$ = 0xe000|($6<<7)|roff($4)|(($2&7)<<2); chkr($2);
+						if ($4 >= -(1<<4) && $4 < (1<<4)) {
+							$$ = 0xe000|($6<<7)|roff($4)|(($2&7)<<2); chkr($2);
+						} else
+						if ($4 > 0 && $4 < (1<<13)) {
+							int v;
+
+							emit(0x6001 | ((7)<<7) | luioff(($4<<3)&0xff00,0));
+							v = $4&0x1f;
+							if (v&(1<<4))
+								v |= (~0)<<4;
+							$$ = 0xe000|($6<<7)|roff(v)|(($2&7)<<2); chkr($2);
+						} else {
+							emit_err("constant must be >= -16 and < 16384");
+							$$ = 0;
+						}
 					 }}
 	|	t_sb r ',' '(' rm ')'	 { if ($6 == 7) {
 						$$ = 0xa002|(($2&7)<<7); chkr($2);
@@ -243,7 +373,7 @@ ins:		t_and  rm ',' rm 	{ $$ = 0x8c61|($2<<7)|($4<<2); }
                                         		} else {
                                                 		delta = delta&~0xff;
                                         		}
-						 	emit(0x6001|((8|$2)<<7)|luioff(delta, 0));
+						 	emit(0x6001|((8|$2)<<7)|luioff(delta&0xff00, 0));
 							delta = ($4)&0xff;
                                 			if (delta&0x80)
                                         			delta = -(0x100-delta);
@@ -259,7 +389,7 @@ ins:		t_and  rm ',' rm 	{ $$ = 0x8c61|($2<<7)|($4<<2); }
                                         		} else {
                                                 		delta = delta&~0xff;
                                         		}
-						 	emit(0x6001|((8|$2)<<7)|luioff(delta, 0));
+						 	emit(0x6001|((8|$2)<<7)|luioff(delta&0xff00, 0));
 							delta = (a)&0xff;
                                 			if (delta&0x80)
                                         			delta = -(0x100-delta);
@@ -273,7 +403,7 @@ ins:		t_and  rm ',' rm 	{ $$ = 0x8c61|($2<<7)|($4<<2); }
                                         		} else {
                                                 		delta = delta&~0xff;
                                         		}
-						 	emit(0x6001|((8|$2)<<7)|luioff(delta, 0));
+						 	emit(0x6001|((8|$2)<<7)|luioff(delta&0xff00, 0));
 							delta = ($4)&0xff;
                                 			if (delta&0x80)
                                         			delta = -(0x100-delta);
@@ -286,7 +416,7 @@ ins:		t_and  rm ',' rm 	{ $$ = 0x8c61|($2<<7)|($4<<2); }
                                         		} else {
                                                 		delta = delta&~0xff;
                                         		}
-						 	emit(0x6001|(($2)<<7)|luioff(delta, 0));
+						 	emit(0x6001|(($2)<<7)|luioff(delta&0xff00, 0));
 							delta = ($4)&0xff;
                                 			if (delta&0x80)
                                         			delta = -(0x100-delta);
@@ -299,7 +429,7 @@ ins:		t_and  rm ',' rm 	{ $$ = 0x8c61|($2<<7)|($4<<2); }
                                         		} else {
                                                 		delta = delta&~0xff;
                                         		}
-						 	emit(0x6001|(($2)<<7)|luioff(delta, 0));
+						 	emit(0x6001|(($2)<<7)|luioff(delta&0xff00, 0));
 							delta = ($4)&0xff;
                                 			if (delta&0x80)
                                         			delta = -(0x100-delta);

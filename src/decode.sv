@@ -277,7 +277,7 @@ module decode(input clk, input reset,
 						2'b10: begin
 									c_op = `OP_AND;
 									c_use_lui_hi = 1;
-									c_lui_hi_type = 1;
+									c_lui_hi_type = 2;
 							   end
 						2'b11: begin
 								c_needs_rs2 = 1;
@@ -520,7 +520,7 @@ module decode(input clk, input reset,
 						2'b10: begin
 									c_op = `OP_OR;
 									c_use_lui_hi = 1;
-									c_lui_hi_type = 1;
+									c_lui_hi_type = 2;
 							   end
 						2'b11: begin
 								c_needs_rs2 = 1;

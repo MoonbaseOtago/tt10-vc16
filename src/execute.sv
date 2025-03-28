@@ -185,8 +185,8 @@ module execute(input clk, input reset,
 	6'b01??_??: r2 = {r_pc, 1'b0};
 	6'b0000_??: r2 = imm;
 	6'b0001_00: r2 = {r_mult[2*RV-1:RV+8], imm[7:0]};
-	6'b0001_01: r2 = {2'b00, r_mult[2*RV-1:RV+8], imm[5:0]};
-	6'b0001_10: r2 = {1'b0, r_mult[2*RV-1:RV+8], imm[6:0]};
+	6'b0001_01: r2 = {3'b00, r_mult[2*RV-1:RV+8], imm[4:0]};
+	6'b0001_10: r2 = {2'b0, r_mult[2*RV-1:RV+8], imm[5:0]};
 	6'b001?_??: r2 = r2reg;
 	default: r2 = {RV{1'bx}};
 	endcase

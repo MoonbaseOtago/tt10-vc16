@@ -44,10 +44,10 @@ are 3 variants (depending on the size of the original constant):
 
 CX0 - on an extended instruction only the 8 LSBs of the original constant is used, the rest are ignored.
       The upper 8 bits come from mulhi.
-CX1 - on an extended instruction only the 6 LSBs of the original constant is used.
+CX1 - on an extended instruction only the 5 LSBs of the original constant is used.
+      The bits 12:5 bits come from mulhi. The upper 3 bits are 000.
+CX2 - on an extended instruction only the 6 LSBs of the original constant is used (bit 0 of that may be 0),
       The bits 13:6 bits come from mulhi. The upper 2 bits are 00.
-CX2 - on an extended instruction only the 7 LSBs of the original constant is used (bit 0 of that is 0),
-      The bits 14:7 bits come from mulhi. The upper bit is 0.
 
 Note: CX1/2 load/store offsets (registers other than FP) are normally signed - so we support small negative offsets and (extended) karge oositive ones.
 
@@ -83,7 +83,7 @@ cccc - constant (details vary to make decoding easy)
 1001 00dd dccc cc01 - srl	rd, rd, ccccc
 1000 01dd dxxs ss01 - sra	rd, rd, rs
 1001 01dd dccc cc01 - sra	rd, rd, ccccc
-100c 10dd dccc cc01 - and	rd, rd, cccccc					CX1
+100c 10dd dccc cc01 - and	rd, rd, cccccc					CX2
 1000 11dd d0ss ss01 - sub	rd, rd, RR		
 1000 11dd d10s ss01 - or	rd, rd, rs
 1000 11dd d11s ss01 - and	rd, rd, rs
@@ -115,7 +115,7 @@ cccc - constant (details vary to make decoding easy)
 011c crrr rccc cc11 - lui	rr, ccccccc000000000 (not inverted sign extensikon)
 1000 00dd dxxs ss11 - sll	rd, rd, rs
 1001 00dd dccc cc11 - sll	rd, rd, ccccc
-100c 10dd dccc cc11 - or	rd, cccccc					CX1
+100c 10dd dccc cc11 - or	rd, cccccc					CX2
 1000 11dd d00s ss11 - mul	rd, rd, rs		(hi result in multhi)
 1000 11dd d01s ss11 - div	rd, rd, rs		(remainder in multhi)
 1000 11dd d10s ss11 - addb	rd, rd, rs		
