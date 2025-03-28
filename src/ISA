@@ -96,7 +96,7 @@ cccc - constant (details vary to make decoding easy)
 000c ccdd dccc cc10 - lw	rd, cccccccc0(0)	addr sign extended	CX0
 001c ccdd dccc cc10 - addi	RX, ccccc					CX0
 010c crdd sccc cc10 - lw	rd, ccccccc0(sp)	addr 0 extended
-101c ccdd dccc cc10 - lb	rd, cccccccc(0)		addr sign extended	CX0
+011c ccdd dccc cc10 - lb	rd, cccccccc(0)		addr sign extended	CX0
 1000 xRRR R000 0010 - jr	(RR)   (jr (epc) is return from exception)
 1000 xrrr r0RR RR10 - mv	rr, RR
 1001 xRRR R000 0010 - jalr	lr, (RR)   

@@ -1915,6 +1915,7 @@ load2td(lp, creloc, b1, b2)
 			}
 		} else {
 			u_int r2, t1, t2, tmp;
+			int w, pc;
 
 			/* next text or data word */
 			if (--Input[TEXT].nsize <= 0) {
@@ -1945,6 +1946,40 @@ load2td(lp, creloc, b1, b2)
 			/*	t = lui	R, addr
 			**	r is reloc
 			*/
+			if (IS_B(r)) {
+				pc = 1;
+				w = 1;
+				/*	t2 = add R, addr */
+			} else {
+				switch (t&0xe003) {
+				case 0x8000:	/* sw name */
+				case 0x0002:	/* lw name */
+					pc = 0;
+					w = 1;
+					break;
+				case 0x6002:	/* lb name */
+				case 0xe002:	/* sb name */
+					pc = 0;
+					w = 0;
+					break;
+
+				case 0x2001:	/* jal	rel */
+				case 0xa001:	/* j	rel */
+					w = 2;
+					pc = 1;
+					break;
+				case 0xc001:	/* beq	rel */
+				case 0xe001:	/* bne	rel */
+				case 0xc003:	/* blt	rel */
+				case 0xe003:	/* bge	rel */
+					w = 0;
+					pc = 1;
+					break;
+				default:
+					error(1, "relocation format botch (unknown instruction))");
+					break;
+				}
+			}
 
 			t1 = ((t&(1<<11))<<3) |
 			     ((t&(1<<12))<<2) |
@@ -1955,20 +1990,53 @@ load2td(lp, creloc, b1, b2)
 				t1 |= (t1<1)&0x8000;
 			}
 			t &= ~0x187c;
-			tmp = ((t2>>5)&0x0003) |	/* add or jalr )li) */
-			      ((t2>>8)&0x001c) |
-			      ((t2<<3)&0x00e0);
-			if (tmp&0x80)
-				tmp |= 0xff00;
-			t2 &= ~0x1c7c;
-			if (IS_B(r)) {
-				/*	t2 = add R, addr */
+			if (pc) {
+				switch (w) {
+				case 1:
+					tmp = ((t2>>5)&0x0003) |	/* add */
+			      	      	      ((t2>>8)&0x001c) |
+			              	      ((t2<<3)&0x00e0);
+					if (tmp&0x80)
+						tmp |= 0xff00;
+					t1 += tmp;
+					t2 &= 0xe383;
+					break;
+				case 0:
+					tmp = (((t1>>3)&3)<<1) |	/* j jal */
+					      (((t1>>10)&3)<<3) |
+					      (((t1>>2)&1)<<5) |
+					      (((t1>>5)&3)<<6);
+					t1 |= tmp;
+					t2 &= 0xe003;
+					break;
+				case 2:
+					tmp = (((t1>>3)&3)<<1) |	/* branch */
+					      (((t1>>10)&3)<<3) |
+					      (((t1>>2)&1)<<5) |
+					      (((t1>>5)&3)<<6);
+					t1 |= tmp;
+					t2 &= 0xe383;
+					break;
+				}
 			} else {
-				/*	t2 = jalr addr(li) */
-				tmp &= 0xfffe;
+				if (w) {
+					tmp = (((t1>>3)&3)<<1) |	/* lw sw  name */
+					      (((t1>>10)&3)<<3) |
+					      (((t1>>2)&1)<<5) |
+					      (((t1>>5)&3)<<6);
+					t1 |= tmp;
+					t2 &= 0xe383;
+				} else {
+					tmp =  ((t1>>12)&1) |
+					      (((t1>>3)&3)<<1) |	/* lw sw  name */
+					      (((t1>>10)&3)<<3) |
+					      (((t1>>2)&1)<<5) |
+					      (((t1>>5)&3)<<6);
+					t1 |= tmp;
+					t2 &= 0xe383;
+				}
+				t1 |= tmp;
 			}
-			t1 += tmp;
-
 			switch (REL_TYPE(r)) {
 			case REL_ABS:
 				break;
@@ -1998,24 +2066,50 @@ load2td(lp, creloc, b1, b2)
 			}
 
 			if (IS_B(r)) {
-				tmp = t1&0xff;
+				tmp = t1&0xff;			
 				t1 &= 0xff00;
 				if (tmp&0x80)
 					t1 += 0x100;
 				if ((t1&0xc000) == 0x4000 || (t1&0xc000) == 0x8000)
 					t |= 0x0002;
+				t2 |= ((tmp&0x0006)<<2) |	/* add */
+			      	      ((tmp&0x0018)<<7) |
+			      	      ((tmp&0x0020)>>3) |
+			      	      ((tmp&0x00c0)>>1);
 			} else {
-				t1 = (t1-(creloc+off+2))&0xffff;
-				tmp = t1&0xfe;
+				if (pc) 
+					t1 = (t1-(creloc+off+2))&0xffff;
+				tmp = t1&0xff;
+				if (pc) {
+					t2 |= ((tmp&0x0006)<<2) |	/* jal/br */
+			      		      ((tmp&0x0018)<<7) |
+			      		      ((tmp&0x0020)>>3) |
+			      		      ((tmp&0x00c0)>>1);
+					
+						t2 |= (((tmp>>1)&3)<<3) |
+						      (((tmp>>3)&3)<<10) |
+						      (((tmp>>5)&1)<<2) |
+						      (((tmp>>5)&3)<<5);
+				} else {
+					if (w) {
+						t2 |= (((tmp>>1)&3)<<3) |
+						      (((tmp>>3)&3)<<10) |
+						      (((tmp>>5)&1)<<2) |
+						      (((tmp>>5)&3)<<5);
+						
+					} else {
+						t2 |= (((tmp>>0)&1)<<12) |
+						      (((tmp>>1)&3)<<3) |
+						      (((tmp>>3)&3)<<10) |
+						      (((tmp>>5)&1)<<2) |
+						      (((tmp>>5)&3)<<5);
+					}
+				}
 				t1 &= 0xff00;
 			}
 			t |= ((t1&0x4000)>>3) |		/* lui */
 			     ((t1&0x2000)>>1) |
 			     ((t1&0x1f00)>>6);
-			t2 |= ((tmp&0x0006)<<2) |	/* add/jal */
-			      ((tmp&0x0018)<<7) |
-			      ((tmp&0x0020)>>3) |
-			      ((tmp&0x00c0)>>1);
 			putw(t, b1);
 			if (rflag)
 				putw(r, b2);
