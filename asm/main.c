@@ -205,7 +205,7 @@ void set_extern(/*int ind*/);
 void set_global(/* int */);
 void align(/* int */);
 int is_global(/* int */);
-int is_short_branch(/* int label */);
+int is_short_branch(/* int label, int next */);
 int is_short_jump(/* int label */);
 void set_file();
 void make_bss(/* int type, int name, int size */);
@@ -652,8 +652,9 @@ int ind;
 }
 
 int
-is_short_branch( ind)
+is_short_branch( ind, next)
 int ind;
+int next;
 {
 	struct symbol *sp;
 	if (first)
@@ -664,7 +665,7 @@ int ind;
 
 		if ((sp->type&N_TYPE) == N_UNDF)
 			return 0;
-		delta =  sp->offset - (seg?data_size:text_size);
+		delta =  sp->offset - ((seg?data_size:text_size)+(next?2:0));
 		if (delta < -(1<<6) || delta >= (1<<6)) {
 			return 0;
 		} else {
