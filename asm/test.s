@@ -1245,6 +1245,28 @@ uux:	lw	a0, 0x1836
 	swap	a0, a3
 	jal     sendx   // 2a
 
+# test add sp
+
+tx:	mov	a3, sp
+	li	a0, 0x1234
+	mov	sp, a0
+	add	sp, 0x1112
+
+	mov	a2, sp
+	mov	a0, sp
+	jal     sendx   // 46
+	swap	a0, a2
+	jal     sendx   // 23
+
+	sub	sp, 0x1112
+	mov	a2, sp
+	mov	a0, sp
+	jal     sendx   // 34
+	swap	a0, a2
+	jal     sendx   // 12
+	
+	mov	sp, a3
+	
 
 
 
