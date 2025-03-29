@@ -57,6 +57,22 @@ The CSR has 2 bits that make the pending constant extension state safe across in
 
 ## Instructions
 
+General formats:
+
+ooooodddsssccccc
+ooooodddcccccccc
+ooooodddsssooooo
+
+Constants that are multiple of 2 are (numbers are bits)
+AAAAAA986543210x
+777777776543210x
+444444444443210X
+Constants that are multiple of 1 are
+7777777775432106
+4444444444442103
+
+
+
 rd - destination register (one of the 8)
 rs - source register (one of the 8)
 rs2 - 2nd source register (one of the 8)
@@ -64,73 +80,83 @@ rr - destination register (one of the 16)
 RR - source register (one of the 16)
 cccc - constant (details vary to make decoding easy)
 
-000c cccc cccd dd00 - add	rd, sp, ccccccc0 				CX0
-001c ccdd dccc cc00 - lw	rd, cccccccc0(fp)	addr sign extended	CX0
-010c ccss sccd dd00 - lw	rd, ccccc0(rs)		addr sign extended	CX2
-011c ccss sccd dd00 - lb	rd, ccccc(rs)		addr sign extended	CX1
+11111 100 000 00000
+54321 098 765 43210
 
-100c ccss sccc cc00 - sw	rs, cccccccc0(0)	addr sign extended	CX0
-101c ccss sccc cc00 - sw	rs, cccccccc0(fp)	addr sign extended	CX0
-110c ccss scc2 2200 - sw	rs, ccccc0(rs2)		addr sign extended	CX2
-111c ccss scc2 2200 - sb	rs, ccccc(rs2)		addr sign extended	CX1
+00000 ddd ccc ccccc - add	rd, sp, ccccccc0 				CX0
+00001 ddd ccc ccccc - lw	rd, cccccccc0(fp)	addr sign extended	CX0
+00010 ddd sss ccccc - lw	rd, ccccc0(rs)		addr sign extended	CX2
+00011 ddd sss ccccc - lb	rd, ccccc(rs)		addr sign extended	CX1
 
-000c ccdd dccc cc01 - add	rd, cccccccc					CX0
-001c ccdd dccc cc01 - jal	lr, cccccccc0(pc)				CX0
-010c ccdd dccc cc01 - li	rd, cccccccc
-011c crrr rccc cc01 - addi2sp	sp, sp, ccccccc0 (rr == 2)			CX0
-		      lui	rr, ccccccc000000000 (rr!=2)
-1000 00dd dxxs ss01 - srl	rd, rd, rs
-1001 00dd dccc cc01 - srl	rd, rd, ccccc
-1000 01dd dxxs ss01 - sra	rd, rd, rs
-1001 01dd dccc cc01 - sra	rd, rd, ccccc
-100c 10dd dccc cc01 - and	rd, rd, cccccc					CX2
-1000 11dd d0ss ss01 - sub	rd, rd, RR		
-1000 11dd d10s ss01 - or	rd, rd, rs
-1000 11dd d11s ss01 - and	rd, rd, rs
-1001 11dd d0ss ss01 - subc	rd, rd, RR	add/sub with carry 	0/1
-1001 11dd d1ss ss01 - addc	rd, rd, RR	carry goes to mulhi	0/-1
-101c cccc cccc cc01 - j		ccccccccccc0(pc)				CX0
-110c ccss sccc cc01 - beqz	rs, ccccccc0(pc)				CX0
-111c ccss sccc cc01 - bnez	rs, ccccccc0(pc)				CX0
+00100 222 ccc ccccc - sw	rs2, cccccccc0(0)	addr sign extended	CX0
+00101 222 ccc ccccc - sw	rs2, cccccccc0(fp)	addr sign extended	CX0
+00110 222 sss ccccc - sw	rs2, ccccc0(rs)		addr sign extended	CX2
+00111 222 sss ccccc - sb	rs2, ccccc(rs)		addr sign extended	CX1
 
-000c ccdd dccc cc10 - lw	rd, cccccccc0(0)	addr sign extended	CX0
-001c ccdd dccc cc10 - addi	RX, ccccc					CX0
-010c crdd sccc cc10 - lw	rd, ccccccc0(sp)	addr 0 extended
-011c ccdd dccc cc10 - lb	rd, cccccccc(0)		addr sign extended	CX0
-1000 xRRR R000 0010 - jr	(RR)   (jr (epc) is return from exception)
-1000 xrrr r0RR RR10 - mv	rr, RR
-1001 xRRR R000 0010 - jalr	lr, (RR)   
-1001 xrrr r0RR RR10 - add	rr, RR
-101c ccss sccc cc10 - sb	rs, cccccccc(fp)	addr sign extended	CX0
-110c cRRR Rccc cc10 - sw	RR, ccccccc0(sp)	addr 0 extended		
-111c ccss sccc cc10 - sb	rs, cccccccc(0)		addr sign extended	CX0
+01000 ddd ccc ccccc - add	rd, cccccccc					CX0
+01001 ccc ccc ccccc - jal	lr, cccccccc0(pc)				CX0
+01010 ddd ccc ccccc - li	rd, cccccccc
+01011 001 0cc ccccc - addi2sp	sp, sp, ccccccc0 (rr == 2)			CX0  DELETE!
+01011 rrr rcc ccccc - lui	rr, 0cccccccc00000000 (rr!=2)
 
-0000 0000 0000 xx11 - trap	(invalid instructions   ....0111 is breakpoint)
-0000 0000 0001 0111 - syscall	
-0000 0000 0001 1011 - swapsp	*	swaps sp and stmp if epc bit 0 is 0, kernel only
-0000 0000 0010 bb11 - flushall	bb *	flushes I and/or D cache (without writeback)
-0000 0000 01bb bb11 - invmmu	bbbbb *  invalidates mmu mappings
-001c ccss scc2 2211 - stio	rs, ccccc0(rs2) *
-010c ccdd dccs ss11 - ldio	rd, ccccc0(rs) *
-011c crrr rccc cc11 - lui	rr, ccccccc000000000 (not inverted sign extensikon)
-1000 00dd dxxs ss11 - sll	rd, rd, rs
-1001 00dd dccc cc11 - sll	rd, rd, ccccc
-100c 10dd dccc cc11 - or	rd, cccccc					CX2
-1000 11dd d00s ss11 - mul	rd, rd, rs		(hi result in multhi)
-1000 11dd d01s ss11 - div	rd, rd, rs		(remainder in multhi)
-1000 11dd d10s ss11 - addb	rd, rd, rs		
-1000 11dd d11s ss11 - addbu	rd, rd, rs		
-1001 11dd d000 0011 - add	rd, rd, pc
-1001 11dd d000 0111 - sext	rd	
-1001 11dd d000 1011 - zext	rd
-1001 11dd d000 1111 - inv	rd
-1001 11dd d001 0011 - neg	rd
-1001 11ss s001 0111 - flushw    (rs) *		flush write cache to mem
-1001 11ss s001 1011 - sub	sp, rs
-1001 11dd d10s ss11 - xor	rd, rd, rs
-101c ccdd sccc rr11 - lb	rd, cccccccc(fp)	addr sign extended	CX0
-110c ccss sccc cc11 - bltz	rs, ccccccc0(pc)				CX0
-111c ccss sccc cc11 - bgez	rs, ccccccc0(pc)				CX0
+01100 ddd sss 00000 - srl	rd, rd, rs
+01100 ddd ccc c1000 - srl	rd, rd, cccc
+01100 ddd sss 00001 - sra	rd, rd, rs
+01100 ddd ccc c1001 - sra	rd, rd, ccccc
+01100 ddd ccc ccc10 - and	rd, rd, cccccc					CX2
+01100 ddd rrr r0011 - sub	rd, rd, RR		
+01100 ddd sss 00111 - or	rd, rd, rs
+01100 ddd sss 10111 - and	rd, rd, rs
+01100 ddd rrr r1011 - subc	rd, rd, RR	add/sub with carry 	0/1
+01100 ddd rrr r1111 - addc	rd, rd, RR	carry goes to mulhi	0/-1
+01101 ccc ccc ccccc - j		ccccccccccc0(pc)				CX0
+01110 sss ccc ccccc - beqz	rs, ccccccc0(pc)				CX0
+01111 sss ccc ccccc - bnez	rs, ccccccc0(pc)				CX0
+
+10000 ddd ccc ccccc - lw	rd, cccccccc0(0)	addr sign extended	CX0
+10001 RRR ccc ccccc - addi	RX, ccccc					CX0
+10010 ddd ccc ccccc - lw	rd, ccccccc0(sp)	addr 0 extended
+10011 ddd ccc ccccc - lb	rd, cccccccc(0)		addr sign extended	CX0
+
+10100 RRR R00 00000 - jr	(RR)   (jr (epc) is return from exception)
+10100 RRR R00 10000 - jalr	lr, (RR)   
+10100 rrr RRR Rr001 - mv	rr, RR
+10100 rrr RRR Rr010 - add	rr, RR
+10100 000 0bb bb011 - invmmu	bbbb *    invalidates mmu mappings 
+
+10101 222 ccc ccccc - sb	rs2, cccccccc(fp)	addr sign extended	CX0
+10110 RRR Rcc ccccc - sw	RR, ccccccc0(sp)	addr 0 extended		
+10111 222 ccc ccccc - sb	rs2, cccccccc(0)		addr sign extended	CX0
+
+11000 free
+11001 222 sss ccccc - stio	rs, ccccc0(rs2) *
+11010 ddd sss ccccc - ldio	rd, ccccc0(rs) *
+11011 rrr rcc ccccc - lui	rr, 1ccccccc00000000 
+11100 ddd sss 00000 - sll	rd, rd, rs
+11100 ddd ccc c1000 - sll	rd, rd, ccccc
+11100 ddd sss 00001 - xor	rd, rd, rs
+11100 ddd ccc c1001 - xor	rd, cccc
+11100 ddd ccc ccc10 - or	rd, cccccc					CX2
+11100 ddd sss 00011 - mul	rd, rd, rs		(hi result in multhi)
+11100 ddd sss 00111 - div	rd, rd, rs		(remainder in multhi)
+11100 ddd sss 01011 - addb	rd, rd, rs		
+11100 ddd sss 01111 - addbu	rd, rd, rs		
+11100 ddd sss 10011 - swap	rd, rs			byte swap rs into rd
+11100 ddd 000 10111 - add	rd, rd, pc
+11100 ddd 001 10111 - sext	rd	
+11100 ddd 010 10111 - zext	rd
+11100 ddd 011 10111 - inv	rd
+11100 ddd 100 10111 - neg	rd
+11100 sss 101 10111 - flushw    (rs) *		flush write cache to mem
+11100 sss 110 10111 - sub	sp, rs
+11100 0xx 111 10111 - trap      (invalid instructions   ....0111 is breakpoint)
+11100 100 111 10111 - syscall
+11100 101 111 10111 - swapsp
+11100 0bb 111 11011 - flushall  bb *    flushes I and/or D cache (without writeback)
+
+11101 ddd ccc ccccc - lb	rd, cccccccc(fp)	addr sign extended	CX0
+11110 sss ccc ccccc - bltz	rs, ccccccc0(pc)				CX0
+11111 sss ccc ccccc - bgez	rs, ccccccc0(pc)				CX0
 
 Instructions marked '*' trap when executed in user mode
 
