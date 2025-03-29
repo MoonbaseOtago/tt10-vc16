@@ -96,8 +96,7 @@ cccc - constant (details vary to make decoding easy)
 01000 ddd ccc ccccc - add	rd, cccccccc					CX0
 01001 ccc ccc ccccc - jal	lr, cccccccc0(pc)				CX0
 01010 ddd ccc ccccc - li	rd, cccccccc
-01011 001 0cc ccccc - addi2sp	sp, sp, ccccccc0 (rr == 2)			CX0  DELETE!
-01011 rrr rcc ccccc - lui	rr, 0cccccccc00000000 (rr!=2)
+01011 rrr rcc ccccc - lui	rr, 0cccccccc00000000
 
 01100 ddd sss 00000 - srl	rd, rd, rs
 01100 ddd ccc c1000 - srl	rd, rd, cccc
@@ -115,7 +114,7 @@ cccc - constant (details vary to make decoding easy)
 
 10000 ddd ccc ccccc - lw	rd, cccccccc0(0)	addr sign extended	CX0
 10001 RRR ccc ccccc - addi	RX, ccccc					CX0
-10010 ddd ccc ccccc - lw	rd, ccccccc0(sp)	addr 0 extended
+10010 rrr rcc ccccc - lw	RR, ccccccc0(sp)	addr 0 extended		CX0
 10011 ddd ccc ccccc - lb	rd, cccccccc(0)		addr sign extended	CX0
 
 10100 RRR R00 00000 - jr	(RR)   (jr (epc) is return from exception)
@@ -125,8 +124,8 @@ cccc - constant (details vary to make decoding easy)
 10100 000 0bb bb011 - invmmu	bbbb *    invalidates mmu mappings 
 
 10101 222 ccc ccccc - sb	rs2, cccccccc(fp)	addr sign extended	CX0
-10110 RRR Rcc ccccc - sw	RR, ccccccc0(sp)	addr 0 extended		
-10111 222 ccc ccccc - sb	rs2, cccccccc(0)		addr sign extended	CX0
+10110 RRR Rcc ccccc - sw	RR, ccccccc0(sp)	addr 0 extended		CX0
+10111 222 ccc ccccc - sb	rs2, cccccccc(0)	addr sign extended	CX0
 
 11000 free
 11001 222 sss ccccc - stio	rs, ccccc0(rs2) *
@@ -242,7 +241,7 @@ A typical kernel trap handler that wants to execute C code
 might look like:
 
 * swapsp
-* sub	sp, 24
+* sub	sp, 26
 * sw	epc, (sp)
 * sw 	stmp, 2(sp)
 * sw 	a0, 4(sp)
@@ -250,9 +249,9 @@ might look like:
 * sw 	s1, 18(sp)
 * sw 	lr, 20(sp)
 * sw 	mulhi, 22(sp)
-* sw 	csr, 22(sp)
+* sw 	csr, 24(sp)
 * jal	c_code
-* lw	csr, (sp)
+* lw	csr, 24(sp)
 * lw	epc, (sp)
 * lw 	stmp, 2(sp)
 * lw 	a0, 4(sp)
@@ -260,9 +259,11 @@ might look like:
 * lw 	s1, 18(sp)
 * lw 	lr, 20(sp)
 * lw 	mulhi, 22(sp)
-* add	sp, 24
+* add	sp, 26
 * swapsp
 * jr	(epc)
+
+Care must be taken not to use an extended constant before mulhi is saved (or after it is recovered).
 
 ## Memory address spaces
 

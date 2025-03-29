@@ -189,6 +189,7 @@ module decode(input clk, input reset,
 						c_rs1 = c_rd;
 						c_use_lui_hi = 1;
 						c_lui_hi_type = 0;
+						c_imm = {{(RV-8){ins[7]}}, ins[7], ins[5:0], ins[6]};
 					end
 		5'b01_001:	begin	// jal
 						c_br = 1;
@@ -203,8 +204,9 @@ module decode(input clk, input reset,
 		5'b01_010:	begin	// li
 						c_op = `OP_ADD;
 						c_rs1 = 0;
+						c_imm = {{(RV-8){ins[7]}}, ins[7], ins[5:0], ins[6]};
 					end
-		5'b01_011:	begin
+		5'b01_011:	begin	// lui
 						c_op = `OP_ADD;
 						c_rd[3] = ins[7];
 						c_rs1 = 0;
@@ -298,8 +300,12 @@ module decode(input clk, input reset,
 						c_load = 1;
 						c_cond = 3'bxx0;
 						c_op = `OP_ADD;
+						c_rd = {ins[7], ins[10:8]}
 						c_rs1 = 2;
+						c_use_lui_hi = 1;
+						c_lui_hi_type = 0;
 						c_trap = !supmode && (c_rd >= 4'b0011 && c_rd <= 4'b0110);
+						c_imm =  {{(RV-8){1'b0}}, ins[6:0], 1'b0};
 					end
 		5'b10_011: begin 	// lb name
 						c_load = 1;
@@ -360,7 +366,7 @@ module decode(input clk, input reset,
 						c_rs1 = {1'b1, 3'b111};
 						c_use_lui_hi = 1;
 						c_lui_hi_type = 0;
-						c_imm = {{(RV-5){ins[4]}}, ins[4], ins[2:0], ins[3]};
+						c_imm = {{(RV-8){ins[7]}}, ins[7], ins[5:0], ins[6]};
 					end
 		5'b10_110:	begin	// swsp  **
 						c_store = 1;
@@ -368,6 +374,8 @@ module decode(input clk, input reset,
 						c_rs2 = {ins[7], ins[10:8]};
 						c_op = `OP_ADD;
 						c_rs1 = 2;
+						c_use_lui_hi = 1;
+						c_lui_hi_type = 0;
 						c_trap = !supmode && (c_rs2 >= 4'b0011 && c_rs2 <= 4'b0110);
 						c_imm =  {{(RV-8){1'b0}}, ins[6:0], 1'b0};
 					end
@@ -521,7 +529,7 @@ module decode(input clk, input reset,
 						c_rs1 = {1'b1, 3'b111};
 						c_use_lui_hi = 1;
 						c_lui_hi_type = 0;
-						c_imm = {{(RV-5){ins[4]}}, ins[4], ins[2:0], ins[3]};
+						c_imm = {{(RV-8){ins[7]}}, ins[7], ins[5:0], ins[6]};
 				    end
 		5'b11_11?:	begin	//  bltz/bgez
 						c_br = 1;
