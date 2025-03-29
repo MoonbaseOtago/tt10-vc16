@@ -300,7 +300,7 @@ module decode(input clk, input reset,
 						c_load = 1;
 						c_cond = 3'bxx0;
 						c_op = `OP_ADD;
-						c_rd = {ins[7], ins[10:8]}
+						c_rd = {ins[7], ins[10:8]};
 						c_rs1 = 2;
 						c_use_lui_hi = 1;
 						c_lui_hi_type = 0;
