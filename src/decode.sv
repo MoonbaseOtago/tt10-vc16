@@ -116,7 +116,7 @@ module decode(input clk, input reset,
 		c_rs1 = {1'b1, ins[7:5]};
 		c_rs2 = {1'b1, ins[10:8]};
 		c_imm = 16'bx;
-		case (ins[15:11]) // synthesis full_case parallel_case
+		casez (ins[15:11]) // synthesis full_case parallel_case
 		5'b00_000: begin	// addi4sp
 						c_op = `OP_ADD;
 						c_use_lui_hi = 1;
