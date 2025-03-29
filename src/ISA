@@ -64,14 +64,13 @@ ooooodddcccccccc
 ooooodddsssooooo
 
 Constants that are multiple of 2 are (numbers are bits)
-AAAAAA986543210x
-777777776543210x
-444444444443210X
+0000 0A98 7654 321x
+0000 0000 7654 321x
+0000 0000 0004 321x
+
 Constants that are multiple of 1 are
-7777777775432106
-4444444444442103
-
-
+7777 7777 7654 3210
+4444 4444 4444 3210
 
 rd - destination register (one of the 8)
 rs - source register (one of the 8)
