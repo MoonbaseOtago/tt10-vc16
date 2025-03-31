@@ -124,6 +124,7 @@ module spi(input clk, input reset,
 		r_bits <= 7;
 		r_searching <= 0;
 		r_count <= 0;
+		r_in <= 0;
 	end else
 	case (r_state)
 	0:	begin
