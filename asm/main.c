@@ -221,277 +221,48 @@ char *cp;
 }
 
 int
-shift_exp(r)
-int r;
-{
-	if (!bit32) {
-		if (r >= 1 && r <= 16)
-			return ((r&0xc)<<1) | ((r&3)<<5);
-		fprintf(stderr, "%d: shift must be between 1 and 16 - %d\n", line, r);
-	} else {
-		if (r >= 1 && r <= 32)
-			return ((r&0xc)<<1) | ((r&7)<<5);
-		fprintf(stderr, "%d: shift must be between 1 and 32 - %d\n", line, r);
-	}
-	errs++;
-	return 0;
-}
-
-
-int
 check_inv(r)
 int r;
 {
 	if (r>=1 &&r <= 15)
-		return r<<2;
+		return r;
 	errs++;
 	fprintf(stderr, "%d: invalid mmu flush %d (must be 1-15)\n", line, r);
 	return 0;
 }
-void
-chkr(r)
-int r;
-{
-	if (r&8)
-		return;
-	errs++;
-	fprintf(stderr, "%d: invalid register\n", line);
-	
-}
 
-int imm6(v)
-int v;
+int
+cs(int v, int mask)
 {
-	if (v < 0 || v >= (1<<6)) {
+	switch (mask) {
+	case 0xff:	return v&0xff;
+	case 0x1f:	return v&0x1f;
+	case 0x1fe:	return (v&0xfe)|((v>>9)&1);
+	case 0x3e:	return (v&0x1e)|((v>>5)&1);
+	case 0x7fe:	return (v&0x7fe)|((v>>11)&1);
+	default:
 		errs++;
-		fprintf(stderr, "%d: invalid constant (must be >=0 <64)\n", line);
+		fprintf(stderr, "%d: BAD MASK\n", line);
 	}
-	return(((v&0x3)<<5) | (((v>>2)&3)<<3) |(((v>>4)&1)<<12) | (((v>>5)&1)<<2));
-}
-
-int imm8(v, l)
-int v, l;
-{
-	if (sizeof(int) > 2 && !bit32 && v&0x8000)
-		v |= 0xffff0000;
-	if (v < -(1<<7) || v >= (1<<7)) {
-		errs++;
-		fprintf(stderr, "%d: invalid constant (must be >=-128 <128)\n", (l?l:line));
-	}
-	return(((v&0x3)<<5) | (((v>>2)&7)<<10)| (((v>>5)&7)<<2));
-}
-
-int roffX7(v)
-int v;
-{
-	if (bit32?v&3:v&1) {
-		errs++;
-		fprintf(stderr, "%d: invalid offset (must be word aligned)\n", line);
-		return 0;
-	}
-	if (bit32) {
-		if (v < -(1<<8) || v >= (1<<8)) {
-			errs++;
-			fprintf(stderr, "%d: invalid offset (must be >=-256 <256)\n", line);
-			return 0;
-		}
-		return ( (((v>>6)&1)<<5) |  (((v>>2)&1)<<6) | (((v>>3)&7)<<10)| (((v>>7)&7)<<7));
-	} else {
-		if (v < -(1<<8) || v >= (1<<8)) {
-			errs++;
-			fprintf(stderr, "%d: invalid offset (must be >=-256 <256)\n", line);
-			return 0;
-		}
-		return ( (((v>>5)&1)<<5)  | (((v>>1)&1)<<6) | (((v>>2)&7)<<10) | (((v>>6)&7)<<7) );
-	}	
-}
-
-int roff7(v)
-int v;
-{
-	if (v < -(1<<7) || v >= (1<<7)) {
-		errs++;
-		fprintf(stderr, "%d: invalid offset (must be >=-128 <128)\n", line);
-		return 0;
-	}
-	return ( (((v>>0)&1)<<6) |  (((v>>1)&7)<<10) | (((v>>4)&1)<<5)| (((v>>5)&7)<<7));
-}
-
-int pack_label(v, mask, type)
-int v;
-int mask;
-int type;
-{
-	if (!(mask&1)) {
-		if (v&1) {
-			errs++;
-			fprintf(stderr, "%d: invalid offset (must be word aligned)\n", line);
-			return 0;
-		}
-		v &= mask;
-		if (type) {
-			return ((((v>>1)&3)<<3) | (((v>>3)&3)<<10) | (((v>>5)&1)<<2) | (((v>>6)&0x3)<<5) | (((v>>8)&1)<<12));
-		} else {
-			return ((((v>>1)&3)<<3) | (((v>>3)&3)<<10) | (((v>>5)&1)<<2) | (((v>>6)&0x1f)<<5) | (((v>>11)&1)<<12));
-		}
-	} else {
-		v &= mask;
-		if (type) {
-			return ((((v>>1)&3)<<3) | (((v>>3)&3)<<10) | (((v>>5)&1)<<2) | (((v>>6)&0x3)<<5) | (((v>>0)&1)<<12));
-		} else {
-			return ((((v>>1)&3)<<3) | (((v>>3)&3)<<10) | (((v>>5)&1)<<2) | (((v>>6)&0xf)<<5) | (((v>>0)&1)<<12));
-		}
-	}
-}
-
-int roffX(v)
-int v;
-{
-	if (bit32?v&3:v&1) {
-		errs++;
-		fprintf(stderr, "%d: invalid offset (must be word aligned)\n", line);
-		return 0;
-	}
-	if (bit32) {
-		if (v < -(1<<6) || v >= (1<<6)) {
-			errs++;
-			fprintf(stderr, "%d: invalid offset (must be >=-64 <64)\n", line);
-			return 0;
-		}
-		return ( (((v>>6)&1)<<5) |  (((v>>2)&1)<<6) | (((v>>3)&7)<<10));
-	} else {
-		if (v < -(1<<5) || v >= (1<<5)) {
-			errs++;
-			fprintf(stderr, "%d: invalid offset (must be >=-32 <32)\n", line);
-			return 0;
-		}
-		return ( (((v>>5)&1)<<5)  | (((v>>1)&1)<<6) | (((v>>2)&7)<<10));
-	}	
-}
-
-int roffIO(v)
-int v;
-{
-	if (v&1) {
-		errs++;
-		fprintf(stderr, "%d: invalid offset (must be word aligned)\n", line);
-		return 0;
-	}
-	if (v < 0 || v >= (1<<6)) {
-		errs++;
-		fprintf(stderr, "%d: invalid offset (must be >=-32 <32)\n", line);
-		return 0;
-	}
-	return ( (((v>>1)&1)<<6) | (((v>>2)&7)<<10) | (((v>>5)&1)<<5) );
 }
 
 int
-roff(v)
-int v;
+cu(int v, int mask)
 {
-	if (v < -(1<<4) || v >= (1<<4)) {
+	switch (mask) {
+	case 0xfe:	return (v&0x7e)|((v>>8)&1);
+	default:
 		errs++;
-		fprintf(stderr, "%d: invalid offset (must be >=0 <32)\n", line);
-		return 0;
+		fprintf(stderr, "%d: BAD MASK\n", line);
 	}
-	if (bit32) {
-		return ( ((v&1)<<5)  | (((v>>1)&1)<<12) | (((v>>2)&1)<<6) | (((v>>3)&3)<<10));
-	} else {
-		return ( ((v&1)<<5)  | (((v>>1)&1)<<6) | (((v>>2)&7)<<10));
-	}	
 }
 
-int offX(v)
-int v;
+void
+chkr(int r)
 {
-	if (bit32?v&3:v&1) {
-		errs++;
-		fprintf(stderr, "%d: invalid offset (must be word aligned)\n", line);
-		return 0;
-	}
-	if (bit32) {
-		if (v < 0 || v >= (1<<9)) {
-			errs++;
-			fprintf(stderr, "%d: invalid offset (must be >=0 <512)\n", line);
-			return 0;
-		}
-		v >>= 2;
-	} else {
-		if (v < 0 || v >= (1<<8)) {
-			errs++;
-			fprintf(stderr, "%d: invalid offset (must be >=0 <256)\n", line);
-			return 0;
-		}
-		v >>= 1;
-	}	
-	return ( ((v&1)<<6)  | (((v>>1)&1)<<5) | (((v>>2)&3)<<11|(((v>>4)&7)<<2)));
-}
-
-int off(v)
-int v;
-{
-	if (v < 0 || v >= (1<<7)) {
-		errs++;
-		fprintf(stderr, "%d: invalid offset (must be >=0 <128)\n", line);
-		return 0;
-	}
-	if (bit32) {
-		return ( ((v&1)<<4)  | (((v>>1)&1)<<6)  | (((v>>2)&1)<<5) | (((v>>3)&3)<<11|(((v>>5)&3)<<2)));
-	} else {
-		return ( ((v&1)<<11)  | (((v>>1)&7)<<4)|(((v>>4)&1)<<12)|(((v>>5)&3)<<2));
-	}	
-}
-
-int zoffX(v)
-int v;
-{
-	if (bit32?v&3:v&1) {
-		errs++;
-		fprintf(stderr, "%d: invalid offset (must be word aligned)\n", line);
-		return 0;
-	}
-	if (bit32) {
-		if (v < 0 || v >= (1<<9)) {
-			errs++;
-			fprintf(stderr, "%d: invalid offset (must be >=0 <512)\n", line);
-			return 0;
-		}
-		v >>= 2;
-	} else {
-		if (v < 0 || v >= (1<<8)) {
-			errs++;
-			fprintf(stderr, "%d: invalid offset (must be >=0 <256)\n", line);
-			return 0;
-		}
-		v >>= 1;
-	}	
-	return ( ((v&1)<<6)  |  (((v>>1)&7)<<10)|(((v>>4)&1)<<5)|(((v>>5)&7)<<7));
-}
-
-int addsp(v)
-int v;
-{
-	if (bit32?v&3:v&1) {
-		errs++;
-		fprintf(stderr, "%d: invalid offset (must be word aligned)\n", line);
-		return 0;
-	}
-	if (bit32) {
-		if (v < -(1<<8) || v >= (1<<8)) {
-			errs++;
-			fprintf(stderr, "%d: invalid offset (must be >=-256 <256)\n", line);
-			return 0;
-		}
-		v >>= 2;
-	} else {
-		if (v < -(1<<7) || v >= (1<<7)) {
-			errs++;
-			fprintf(stderr, "%d: invalid offset (must be >=-128 <128)\n", line);
-			return 0;
-		}
-		v >>= 1;
-	}	
-	return ( ((v&1)<<6)  | (((v>>1)&1)<<5) | (((v>>2)&3)<<11)|(((v>>4)&7)<<2) );
+	if (r&8)
+		return;
+	fprintf(stderr, "%d: left register is not a general register\n", line);
 }
 
 int luioff(v, l)
@@ -506,11 +277,10 @@ int v, l;
 		return 0;
 	}
 	v>>=8;
-
-	if (((v>>7)&1) != ((v>>6)&1)) {
-		return 2|(((v&0x1f)<<2)| (((v>>5)&1)<<12) | (((v>>6)&1)<<11));
-	}
-	return (((v&0x1f)<<2)| (((v>>5)&1)<<12) | (((v>>6)&1)<<11));
+	
+	if (v&0x80)
+		return(0x8000|(v&0x7f));
+	return(0x0000|(v&0x7f));
 }
 
 int simple_li(v)
@@ -521,19 +291,6 @@ int v;
 	if (v < -(1<<7) || v >= (1<<7) ) 
 		return 0;
 	return 1;
-}
-
-int lioff(v)
-int v;
-{
-	if (sizeof(int) > 2 && !bit32 && v&0x8000)
-		v |= 0xffff0000;
-	if (v < -(1<<7) || v >= (1<<7) ) {
-		errs++;
-		fprintf(stderr, "%d: invalid constant (must be signed 7 bits)\n", line);
-		return 0;
-	}
-	return(((v&0x3)<<5) | (((v>>2)&7)<<10)| (((v>>5)&7)<<2));
 }
 
 int yylex();
@@ -768,7 +525,7 @@ use:
 								fprintf(stderr, "%d: '%df' jmp too far\n", rp->line, ind);
 							} else {
 								if (last)
-									cp[rp->offset>>1] |= (((delta>>1)&3)<<3) | (((delta>>3)&3)<<10) | (((delta>>5)&1)<<2) | (((delta>>6)&0x1f)<<5) | (((delta>>11)&1)<<12);
+									cp[rp->offset>>1] |= cs(delta, 0x07fe);
 							}
 						} else {
 							if (delta < -(1<<8) || delta >= (1<<8)) {
@@ -776,7 +533,7 @@ use:
 								fprintf(stderr, "%d: '%df' branch too far\n", rp->line, ind);
 							} else {
 								if (last)
-								cp[rp->offset>>1] |= (((delta>>1)&3)<<3) | (((delta>>3)&3)<<10) | (((delta>>5)&1)<<2) | (((delta>>6)&3)<<5) | (((delta>>8)&1)<<12);
+								cp[rp->offset>>1] |= cs(delta, 0x1fe);
 							}
 						}
 					}
@@ -912,7 +669,7 @@ int ind, type, offset;
 						fprintf(stderr, "%d: '%db' jmp too far\n", line, ind);
 						return 0;
 					} else {
-						return  (((delta>>1)&3)<<3) | (((delta>>3)&3)<<10) | (((delta>>5)&1)<<2) | (((delta>>6)&0x1f)<<5) | (((delta>>11)&1)<<12);
+						return  cs(delta, 0x07fe);
 					}
 				} else {
 					if (delta < -(1<<8) || delta >= (1<<8)) {
@@ -920,7 +677,7 @@ int ind, type, offset;
 						fprintf(stderr, "%d: '%db' branch too far\n", line, ind);
 						return 0;
 					} else {
-						return  (((delta>>1)&3)<<3) | (((delta>>3)&3)<<10) | (((delta>>5)&1)<<2) | (((delta>>6)&3)<<5) | (((delta>>8)&1)<<12);
+						return  cs(delta, 0x1fe);
 					}
 				}
 			}
@@ -1605,7 +1362,7 @@ notdef:
 					errs++;
 					fprintf(stderr, "%d: '%s' jmp too far\n", rp->line, sp->name);
 				} else {
-					v = (((delta>>1)&3)<<3) | (((delta>>3)&3)<<10) | (((delta>>5)&1)<<2) | (((delta>>6)&0x1f)<<5) | (((delta>>11)&1)<<12);
+					v = cs(delta, 0x07fe);
 					t[rp->offset>>1] |= v;
 				}
 				break;
@@ -1615,7 +1372,7 @@ notdef:
 					errs++;
 					fprintf(stderr, "%d: '%s' branch too far\n", rp->line, sp->name);
 				} else {
-					v = (((delta>>1)&3)<<3) | (((delta>>3)&3)<<10) | (((delta>>5)&1)<<2) | (((delta>>6)&3)<<5) | (((delta>>8)&1)<<12);
+					v = cs(delta, 0x1fe);
 					t[rp->offset>>1] |= v;
 				}
 				break;
@@ -1631,7 +1388,7 @@ notdef:
 				delta = ((aout&&(sp->type == (N_EXT|N_UNDF))?0:sp->offset)+rp->extra)&0xff;
 				if (delta&0x80) 
 					delta = -(0x100-delta);
-				t[(rp->offset>>1)+1] |= imm8(delta, rp->line);
+				t[(rp->offset>>1)+1] |= cs(delta, 0xff);
 				break;
 			case 8:	/* jal lui li part */
 				delta = ((aout&&(sp->type == (N_EXT|N_UNDF))?0:sp->offset-(rp->offset+2))+rp->extra)&0xffff;
@@ -1643,7 +1400,7 @@ notdef:
 					errs++;
 					fprintf(stderr, "%d: '%s' jump to odd address\n", rp->line, sp->name);
 				} else 
-				t[(rp->offset>>1)+1] |= (((delta>>1)&3)<<3) | (((delta>>3)&3)<<10) | (((delta>>5)&1)<<2) | (((delta>>6)&0x1f)<<5) | (((delta>>11)&1)<<12);
+				t[(rp->offset>>1)+1] |= cs(delta, 0x07fe);
 				break;
 			case 10:/* lw/sw  name  lui li part */
 				delta = ((aout&&(sp->type == (N_EXT|N_UNDF))?0:sp->offset)+rp->extra)&0xffff;
@@ -1655,7 +1412,7 @@ notdef:
 					errs++;
 					fprintf(stderr, "%d: '%s' lw/sw to odd address\n", rp->line, sp->name);
 				} else 
-				t[(rp->offset>>1)+1] |= pack_label(delta, 0xfe, 1);
+				t[(rp->offset>>1)+1] |= cs(delta, 0x1fe);
 				break;
 			case 11:/* lb/sb  name  lui li part */
 				delta = ((aout&&(sp->type == (N_EXT|N_UNDF))?0:sp->offset)+rp->extra)&0xffff;
@@ -1667,7 +1424,7 @@ notdef:
 					errs++;
 					fprintf(stderr, "%d: '%s' lw/sw to odd address\n", rp->line, sp->name);
 				} else 
-				t[(rp->offset>>1)+1] |= pack_label(delta, 0xff, 1);
+				t[(rp->offset>>1)+1] |= cs(delta, 0xff);
 				break;
 			}
 		}

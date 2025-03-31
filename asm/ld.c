@@ -707,7 +707,7 @@ u_int	ovbase;			/* The base address of the overlays */
 	short	*lookup(), *slookup(), *lookloc();
 	char	*rstrtab;	/* ranlib string table pointer */
 	u_int	add();
-	int	delexit();
+	void	delexit(int a);
 	VADDR	sym2va();
 	off_t	skip();
 extern	long	lseek(), atol(), strtol();
@@ -905,14 +905,15 @@ next:
 	exit(0);
 }
 
-delexit()
+void delexit(a)
+int a;
 	{
 
 	unlink("l.out");
 	if (delarg==0)
 		chmod(ofilename, 0777 & ~umask(0));
-	printf("ld: nswaps: %ld, nmapsegs: %ld sbrk(0): %u\n", nswaps, 
-		nmapsegs, sbrk(0));
+	printf("ld: nswaps: %ld, nmapsegs: %ld sbrk(0): %u\n", (long)nswaps, 
+		(long)nmapsegs, sbrk(0));
 	exit(delarg);
 	}
 
@@ -1981,61 +1982,43 @@ load2td(lp, creloc, b1, b2)
 				}
 			}
 
-			t1 = ((t&(1<<11))<<3) |
-			     ((t&(1<<12))<<2) |
-			     ((t&(0x1f<<2))<<6); 
-			if (t&2) {
-				t1 |= ((~t1)<1)&0x8000;
-			} else {
-				t1 |= (t1<1)&0x8000;
-			}
-			t &= ~0x187c;
+			t1 = (t&0x8000) |
+			     ((t&0x7f)<<8);
+			t &= ~0x807f;
 			if (pc) {
 				switch (w) {
 				case 1:
-					tmp = ((t2>>5)&0x0003) |	/* add */
-			      	      	      ((t2>>8)&0x001c) |
-			              	      ((t2<<3)&0x00e0);
-					if (tmp&0x80)
-						tmp |= 0xff00;
+					tmp = (t2&0xff) |	/* add */
+			      	      	      (t2&0x80?0xff00:0x0000);
 					t1 += tmp;
-					t2 &= 0xe383;
+					t1 &= 0xffff;
+					t2 &= 0xff00;
 					break;
 				case 0:
-					tmp = (((t1>>3)&3)<<1) |	/* j jal */
-					      (((t1>>10)&3)<<3) |
-					      (((t1>>2)&1)<<5) |
-					      (((t1>>5)&3)<<6);
+					tmp = (t2&0x07fe) |	/* j jal */
+					      (t2&1?0xf800:0x0000);
 					t1 |= tmp;
-					t2 &= 0xe003;
+					t2 &= 0xe800;
 					break;
 				case 2:
-					tmp = (((t1>>3)&3)<<1) |	/* branch */
-					      (((t1>>10)&3)<<3) |
-					      (((t1>>2)&1)<<5) |
-					      (((t1>>5)&3)<<6);
+					tmp = (t2&0xfe) |	/* branch */
+			      	      	      (t2&1?0xff00:0x0000);
 					t1 |= tmp;
-					t2 &= 0xe383;
+					t2 &= 0xff00;
 					break;
 				}
 			} else {
 				if (w) {
-					tmp = (((t1>>3)&3)<<1) |	/* lw sw  name */
-					      (((t1>>10)&3)<<3) |
-					      (((t1>>2)&1)<<5) |
-					      (((t1>>5)&3)<<6);
+					tmp = (t2&0xfe) |	/* lw sw  name */
+					      (t2&1?0xff00:0x0000);
 					t1 |= tmp;
-					t2 &= 0xe383;
+					t2 &= 0xff00;
 				} else {
-					tmp =  ((t1>>12)&1) |
-					      (((t1>>3)&3)<<1) |	/* lw sw  name */
-					      (((t1>>10)&3)<<3) |
-					      (((t1>>2)&1)<<5) |
-					      (((t1>>5)&3)<<6);
+					tmp = (t2&0xff) |
+					      (t1&0x80?0xff00:0x0000);	/* lb sw  name */
 					t1 |= tmp;
-					t2 &= 0xe383;
+					t2 &= 0xff00;
 				}
-				t1 |= tmp;
 			}
 			switch (REL_TYPE(r)) {
 			case REL_ABS:
@@ -2064,52 +2047,34 @@ load2td(lp, creloc, b1, b2)
 			default:
 				error(1, "relocation format botch (symbol type))");
 			}
+			t1 &= 0xffff;
 
 			if (IS_B(r)) {
-				tmp = t1&0xff;			
+				tmp = t1&0xfe;			
 				t1 &= 0xff00;
 				if (tmp&0x80)
 					t1 += 0x100;
-				if ((t1&0xc000) == 0x4000 || (t1&0xc000) == 0x8000)
-					t |= 0x0002;
-				t2 |= ((tmp&0x0006)<<2) |	/* add */
-			      	      ((tmp&0x0018)<<7) |
-			      	      ((tmp&0x0020)>>3) |
-			      	      ((tmp&0x00c0)>>1);
+				t |= t1&0x8000;
+				t |= (t1>>8)&0x7f;
+				t2 |= (tmp&0xfe) |	/* add */
+			      	      (tmp&0x80?1:0);
 			} else {
 				if (pc) 
 					t1 = (t1-(creloc+off+2))&0xffff;
 				tmp = t1&0xff;
+				t1 &= 0xff00;
+				t |= t1&0x8000;
+				t1 |= (t1>>8)&0x7f;
 				if (pc) {
-					t2 |= ((tmp&0x0006)<<2) |	/* jal/br */
-			      		      ((tmp&0x0018)<<7) |
-			      		      ((tmp&0x0020)>>3) |
-			      		      ((tmp&0x00c0)>>1);
-					
-						t2 |= (((tmp>>1)&3)<<3) |
-						      (((tmp>>3)&3)<<10) |
-						      (((tmp>>5)&1)<<2) |
-						      (((tmp>>5)&3)<<5);
+					t2 |= tmp&0xfe;	/* jal/br */
 				} else {
-					if (w) {
-						t2 |= (((tmp>>1)&3)<<3) |
-						      (((tmp>>3)&3)<<10) |
-						      (((tmp>>5)&1)<<2) |
-						      (((tmp>>5)&3)<<5);
-						
-					} else {
-						t2 |= (((tmp>>0)&1)<<12) |
-						      (((tmp>>1)&3)<<3) |
-						      (((tmp>>3)&3)<<10) |
-						      (((tmp>>5)&1)<<2) |
-						      (((tmp>>5)&3)<<5);
+					if (w) {	/* lw */
+						t2 |= tmp&0xfe;
+					} else {	/* lb */
+						t2 |= tmp;
 					}
 				}
-				t1 &= 0xff00;
 			}
-			t |= ((t1&0x4000)>>3) |		/* lui */
-			     ((t1&0x2000)>>1) |
-			     ((t1&0x1f00)>>6);
 			putw(t, b1);
 			if (rflag)
 				putw(r, b2);
@@ -2331,7 +2296,7 @@ finishout()
 		errlev = 2;
 	}
 	delarg = errlev;
-	delexit();
+	delexit(0);
 }
 
 long
@@ -2580,7 +2545,7 @@ error(n, s)
 char *s;
 {
 	if (!s)
-		delexit();
+		delexit(0);
 	if (errlev==0)
 		printf("ld:");
 	if (filname) {
@@ -2593,7 +2558,7 @@ char *s;
 	if (n == -1)
 		return;
 	if (n)
-		delexit();
+		delexit(0);
 	errlev = 2;
 }
 

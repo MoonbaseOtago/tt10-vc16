@@ -102,7 +102,6 @@ cccc - constant (details vary to make decoding easy)
 01100 ddd sss 00001 - sra	rd, rd, rs
 01100 ddd ccc c1001 - sra	rd, rd, ccccc
 01100 ddd ccc ccc10 - and	rd, rd, cccccc					CX2
-01100 ddd rrr r0011 - sub	rd, rd, RR		
 01100 ddd sss 00111 - or	rd, rd, rs
 01100 ddd sss 10111 - and	rd, rd, rs
 01100 ddd rrr r1011 - subc	rd, rd, RR	add/sub with carry 	0/1
@@ -120,7 +119,8 @@ cccc - constant (details vary to make decoding easy)
 10100 RRR R00 10000 - jalr	lr, (RR)   
 10100 rrr RRR Rr001 - mv	rr, RR
 10100 rrr RRR Rr010 - add	rr, RR
-10100 000 0bb bb011 - invmmu	bbbb *    invalidates mmu mappings 
+10100 rrr RRR Rr011 - sub	rr, RR		
+10100 000 0bb bb100 - invmmu	bbbb *    invalidates mmu mappings 
 
 10101 222 ccc ccccc - sb	rs2, cccccccc(fp)	addr sign extended	CX0
 10110 RRR Rcc ccccc - sw	RR, ccccccc0(sp)	addr 0 extended		CX0
@@ -146,15 +146,14 @@ cccc - constant (details vary to make decoding easy)
 11100 ddd 011 10111 - inv	rd
 11100 ddd 100 10111 - neg	rd
 11100 sss 101 10111 - flushw    (rs) *		flush write cache to mem
-11100 sss 110 10111 - sub	sp, rs
 11100 0xx 111 10111 - trap      (invalid instructions   ....0111 is breakpoint)
 11100 100 111 10111 - syscall
 11100 101 111 10111 - swapsp
 11100 0bb 111 11011 - flushall  bb *    flushes I and/or D cache (without writeback)
 
 11101 ddd ccc ccccc - lb	rd, cccccccc(fp)	addr sign extended	CX0
-11110 sss ccc ccccc - bltz	rs, ccccccc0(pc)				CX0
-11111 sss ccc ccccc - bgez	rs, ccccccc0(pc)				CX0
+11110 sss ccc ccccc - bgez	rs, ccccccc0(pc)				CX0
+11111 sss ccc ccccc - bltz	rs, ccccccc0(pc)				CX0
 
 Instructions marked '*' trap when executed in user mode
 

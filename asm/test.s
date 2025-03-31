@@ -154,8 +154,7 @@ l:		add a1, -1
 	add	a0, 1
 	jal	send		// 7
 
-	la	a0, loc
-	mv	sp, a0
+	la	sp, loc
 	lw	a1, 2(sp)	// 5599
 	mv	a0, a1
 	jal     send  		// 99
@@ -1159,8 +1158,8 @@ farx:	jal     sendx
 
 	li	r7, 0
 	li	a1, 0x1f
-	sb	a1, 0x1832(r7)
-	li	a0, 0x1832
+	sb	a1, 0x1833(r7)
+	li	a0, 0x1833
 	lb	a0, (a0)
 	mov	r7, a3
 	jal     sendx   // 1f
@@ -1192,8 +1191,8 @@ farx:	jal     sendx
 	jal     sendx   // 34
 
 	li	a1, 0x1f
-	sb	a1, 0x1834(a3)
-	li	a0, 0x1834
+	sb	a1, 0x1835(a3)
+	li	a0, 0x1835
 	lb	a0, (a0)
 	jal     sendx   // 1f
 
@@ -1266,6 +1265,20 @@ tx:	mov	a3, sp
 	jal     sendx   // 12
 	
 	mov	sp, a3
+
+# test and or xor short constants
+
+	li	a0, 0x33
+	or	a0, 0xaa
+	jal	sendx		// BB
+	
+	li	a0, 0x33
+	and	a0, 0xaa
+	jal	sendx		// 22
+	
+	li	a0, 0x3
+	xor	a0, 0xa
+	jal	sendx		// 09
 	
 
 

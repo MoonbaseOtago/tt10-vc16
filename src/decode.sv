@@ -243,10 +243,8 @@ module decode(input clk, input reset,
 						2'b11: begin
 								c_needs_rs2 = 1;
 								casez ({ins[4:2]}) // synthesis full_case parallel_case
-								3'b?_00:	begin
-												c_rs2[3] = ins[4];
-												c_op = `OP_SUB;
-												c_trap = !supmode && (c_rs2 >= 4'b0011 && c_rs2 <= 4'b0110);
+								3'b?_00:	begin // free
+												c_trap = 1;
 											end
 								3'b0_01:	c_op = `OP_OR;
 								3'b1_01:	c_op = `OP_AND;
@@ -344,21 +342,29 @@ module decode(input clk, input reset,
 							end
 					3'b001:	begin	// mov
 								c_op = `OP_ADD;
-								c_rd[3] = ins[4];
+								c_rd[3] = ins[3];
 								c_rs1 = 0;
-								c_rs2 = {ins[3], ins[7:5]};
+								c_rs2 = {ins[4], ins[7:5]};
 								c_needs_rs2 = 1;
 								c_trap = (!supmode && ((c_rs2 >= 4'b0011 && c_rs2 <= 4'b0110) || (c_rs1 >= 4'b0011 && c_rs1 <= 4'b0110)));
 						end
 					3'b010: begin	// add
 								c_op = `OP_ADD;
-								c_rd[3] = ins[4];
-								c_rs1 = {ins[4], ins[10:8]};;
-								c_rs2 = {ins[3], ins[7:5]};
+								c_rd[3] = ins[3];
+								c_rs1 = {ins[3], ins[10:8]};
+								c_rs2 = {ins[4], ins[7:5]};
 								c_needs_rs2 = 1;
 								c_trap = (!supmode && ((c_rs2 >= 4'b0011 && c_rs2 <= 4'b0110) || (c_rs1 >= 4'b0011 && c_rs1 <= 4'b0110)));
 							end
-					3'b011:	begin	 // invmmu  si sd ui ud
+					3'b011: begin	// sub
+								c_op = `OP_SUB;
+								c_rd[3] = ins[3];
+								c_rs1 = {ins[3], ins[10:8]};
+								c_rs2 = {ins[4], ins[7:5]};
+								c_needs_rs2 = 1;
+								c_trap = (!supmode && ((c_rs2 >= 4'b0011 && c_rs2 <= 4'b0110) || (c_rs1 >= 4'b0011 && c_rs1 <= 4'b0110)));
+							end
+					3'b100:	begin	 // invmmu  si sd ui ud
 								c_rd = 0;
 								c_inv_mmu = supmode;
 								c_imm = {{(RV-4){1'bx}}, ins[6:3]};
@@ -443,6 +449,7 @@ module decode(input clk, input reset,
 									c_op = `OP_OR;
 									c_use_lui_hi = 1;
 									c_lui_hi_type = 2;
+									c_imm = {10'b0, ins[7:2]};
 							   end
 						2'b11: begin
 								c_needs_rs2 = 1;
@@ -473,7 +480,7 @@ module decode(input clk, input reset,
 													c_rs2 = 0;
 													c_rs2_inv = 1;
 												end   
-										3'b100: begin //neg
+										3'b100: begin // neg
 													c_op = `OP_SUB;
 													c_rs1 = 0;
 													c_rs2 = {1'b1, ins[10:8]};
@@ -489,11 +496,8 @@ module decode(input clk, input reset,
 													c_imm = 0;
 													c_trap = !supmode;
 												end
-										3'b110: begin // sub sp. r
-													c_op = `OP_SUB;
-													c_rd = 2;
-													c_rs1 = 2;
-													c_rs2 =  {1'b1, ins[10:8]};
+										3'b110: begin // free
+													c_trap = 1;
 												end 
 										3'b111:	casez (ins[10:8]) // synthesis full_case parallel_case
 												3'b0??: begin	// trap instructions (use 01 for break)
