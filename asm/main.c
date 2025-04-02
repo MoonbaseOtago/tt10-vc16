@@ -74,7 +74,7 @@
 
 #define REL_SYMBOL(x) ((x)>>4)
 
-#define MAKE_REL(symbol, x, type) (((symbol)<<4)|((type)!=REL_C?((type)<<1)|(x):(x)==REL_ABS?0xb:(x)==REL_EXTERN?0xd:0x8|((type)<<1)))
+#define MAKE_REL(symbol, type, x) (((symbol)<<4)|((type)!=REL_C?(type)|((x)<<1):(x)==REL_ABS?0xb:(x)==REL_EXTERN?0xd:0x8|((x)<<1)))
 
 #ifndef BSD
 struct	exec {
@@ -242,7 +242,7 @@ cs(int v, int mask)
 	case 0x7fe:	return (v&0x7fe)|((v>>11)&1);
 	default:
 		errs++;
-		fprintf(stderr, "%d: BAD MASK\n", line);
+		fprintf(stderr, "%d: BAD MASK %x\n", line, mask);
 	}
 }
 
@@ -253,7 +253,7 @@ cu(int v, int mask)
 	case 0xfe:	return (v&0x7e)|((v>>8)&1);
 	default:
 		errs++;
-		fprintf(stderr, "%d: BAD MASK\n", line);
+		fprintf(stderr, "%d: BAD MASK %x\n", line, mask);
 	}
 }
 
@@ -1391,16 +1391,16 @@ notdef:
 				t[(rp->offset>>1)+1] |= cs(delta, 0xff);
 				break;
 			case 8:	/* jal lui li part */
-				delta = ((aout&&(sp->type == (N_EXT|N_UNDF))?0:sp->offset-(rp->offset+2))+rp->extra)&0xffff;
+				delta = ((aout&&(sp->type == (N_EXT|N_UNDF))?0:sp->offset)-(rp->offset+2)+rp->extra)&0xffff;
 				delta = delta&~0xff;
 				t[rp->offset>>1] |= luioff(delta, rp->line);
 				/* la jr  X(li)  part */
-				delta = ((aout&&(sp->type == (N_EXT|N_UNDF))?0:sp->offset-(rp->offset+2))+rp->extra)&0xff;
+				delta = ((aout&&(sp->type == (N_EXT|N_UNDF))?0:sp->offset)-(rp->offset+2)+rp->extra)&0xfe;
 				if (delta&1) {
 					errs++;
 					fprintf(stderr, "%d: '%s' jump to odd address\n", rp->line, sp->name);
 				} else 
-				t[(rp->offset>>1)+1] |= cs(delta, 0x07fe);
+				t[(rp->offset>>1)+1] |= cs(delta, 0x01fe);
 				break;
 			case 10:/* lw/sw  name  lui li part */
 				delta = ((aout&&(sp->type == (N_EXT|N_UNDF))?0:sp->offset)+rp->extra)&0xffff;
@@ -1420,10 +1420,6 @@ notdef:
 				t[rp->offset>>1] |= luioff(delta, rp->line);
 				/* la jr  X(li)  part */
 				delta = ((aout&&(sp->type == (N_EXT|N_UNDF))?0:sp->offset)+rp->extra)&0xff;
-				if (delta&1) {
-					errs++;
-					fprintf(stderr, "%d: '%s' lw/sw to odd address\n", rp->line, sp->name);
-				} else 
 				t[(rp->offset>>1)+1] |= cs(delta, 0xff);
 				break;
 			}
@@ -1533,6 +1529,12 @@ outerr:
 									}
 									break;
 								case 8:	/* jal li, addr */
+									if (sp->type == (N_EXT|N_UNDF)) {
+										s = MAKE_REL(sp->toffset, REL_C, REL_EXTERN); 
+									} else {
+										s = 0;
+									}
+									break;
 								case 10:
 								case 11:
 									if (sp->type == (N_EXT|N_UNDF)) {

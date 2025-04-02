@@ -549,7 +549,7 @@ int putw(int w, FILE *f) {
 #define REL_TYPE(x) (IS_ABS(x)?REL_ABS:IS_TEXT(x)?REL_TEXT:IS_DATA(x)?REL_DATA:IS_BSS(x)?REL_BSS:REL_EXTERN)
 
 #define REL_SYMBOL(x) ((x)>>4)
-#define MAKE_REL(symbol, x, type) (((symbol)<<4)|((type)!=REL_C?((type)<<1)|(x):(x)==REL_ABS?0xb:(x)==REL_EXTERN?0xd:0x8|((type)<<1)))
+#define MAKE_REL(symbol, type, x) (((symbol)<<4)|((type)!=REL_C?(type)|((x)<<1):(x)==REL_ABS?0xb:(x)==REL_EXTERN?0xd:0x8|((x)<<1)))
 
 #endif
 
@@ -1884,6 +1884,7 @@ load2td(lp, creloc, b1, b2)
 		} else
 			r = *Input[RELOC].Iptr++;
 #ifdef _VC_
+		if (r) 
 		if (IS_A(r)) {
 			switch (REL_TYPE(r)) {
 			case REL_ABS:
@@ -1952,31 +1953,37 @@ load2td(lp, creloc, b1, b2)
 				w = 1;
 				/*	t2 = add R, addr */
 			} else {
-				switch (t&0xe003) {
-				case 0x8000:	/* sw name */
-				case 0x0002:	/* lw name */
+				switch (t2&0xf800) {
+				case 0x4000:	/* add */
+				case 0x8800:	/* add */
 					pc = 0;
 					w = 1;
 					break;
-				case 0x6002:	/* lb name */
-				case 0xe002:	/* sb name */
+				case 0x2000:	/* sw name */
+				case 0x8000:	/* lw name */
+					pc = 0;
+					w = 1;
+					break;
+				case 0x9800:	/* lb name */
+				case 0xb800:	/* sb name */
 					pc = 0;
 					w = 0;
 					break;
 
-				case 0x2001:	/* jal	rel */
-				case 0xa001:	/* j	rel */
+				case 0x4800:	/* jal	rel */
+				case 0x6800:	/* j	rel */
 					w = 2;
 					pc = 1;
 					break;
-				case 0xc001:	/* beq	rel */
-				case 0xe001:	/* bne	rel */
-				case 0xc003:	/* blt	rel */
-				case 0xe003:	/* bge	rel */
+				case 0x7000:	/* beq	rel */
+				case 0x7800:	/* bne	rel */
+				case 0xf000:	/* blt	rel */
+				case 0xf800:	/* bge	rel */
 					w = 0;
 					pc = 1;
 					break;
 				default:
+					fprintf(stderr, "ins = 0x%04x/%04x %04x/%04x off=0x%04x\n", t, r, t2, r2, off);
 					error(1, "relocation format botch (unknown instruction))");
 					break;
 				}
@@ -2050,14 +2057,13 @@ load2td(lp, creloc, b1, b2)
 			t1 &= 0xffff;
 
 			if (IS_B(r)) {
-				tmp = t1&0xfe;			
+				tmp = t1&0xff;			
 				t1 &= 0xff00;
 				if (tmp&0x80)
 					t1 += 0x100;
 				t |= t1&0x8000;
 				t |= (t1>>8)&0x7f;
-				t2 |= (tmp&0xfe) |	/* add */
-			      	      (tmp&0x80?1:0);
+				t2 |= tmp&0xff;	/* add */
 			} else {
 				if (pc) 
 					t1 = (t1-(creloc+off+2))&0xffff;
@@ -2066,7 +2072,11 @@ load2td(lp, creloc, b1, b2)
 				t |= t1&0x8000;
 				t1 |= (t1>>8)&0x7f;
 				if (pc) {
-					t2 |= tmp&0xfe;	/* jal/br */
+					if (w == 2) {
+						t2 |= tmp;	/* add */
+					} else {
+						t2 |= tmp&0xfe;	/* jal/br */
+					}
 				} else {
 					if (w) {	/* lw */
 						t2 |= tmp&0xfe;
@@ -2112,8 +2122,8 @@ load2td(lp, creloc, b1, b2)
 		}
 		if (r&01)
 			t -= creloc;
-		off += 2;
 #endif
+		off += 2;
 		putw(t, b1);
 		if (rflag)
 			putw(r, b2);
