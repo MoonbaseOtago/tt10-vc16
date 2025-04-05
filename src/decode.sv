@@ -197,7 +197,7 @@ module decode(input clk, input reset,
 					end
 		5'b01_001:	begin	// jal
 						c_br = 1;
-						c_cond = 3'b1x1;
+						c_cond = 3'b111;
 						c_op = `OP_ADD;
 						c_use_lui_hi = 1;
 						c_lui_hi_type = 0;
@@ -267,7 +267,7 @@ module decode(input clk, input reset,
 					end
 		5'b01_101:	begin	// j
 						c_br = 1;
-						c_cond = 3'b1x0;
+						c_cond = 3'b110;
 						c_op = `OP_ADD;
 						c_use_lui_hi = 1;
 						c_lui_hi_type = 0;
@@ -402,7 +402,17 @@ module decode(input clk, input reset,
 						c_imm = {{(RV-8){ins[7]}}, ins[7:0]};
 					end
 		5'b11_000:	begin	//  free
-						c_trap = 1;
+						casez (ins[10:8]) // synthesis full_case parallel_case
+						3'b00?:	begin
+									c_br = 1;
+									c_cond = {2'b10, ins[8]};	// bhi/blo
+									c_rs1 = 3'bxxx;
+									c_op = `OP_ADD;
+									c_imm = {{(RV-8){ins[0]}}, ins[7:1],1'b0};
+								end
+						default:
+							c_trap = 1;
+						endcase
 				    end
 		5'b11_001: begin 	// swio
 						c_store = 1;

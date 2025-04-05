@@ -1279,6 +1279,67 @@ tx:	mov	a3, sp
 	li	a0, 0x3
 	xor	a0, 0xa
 	jal	sendx		// 09
+
+// test unsigned branches
+
+	li	a1, 0xf000
+
+	li	a2, 0xf001
+	li	a0, 0
+	subc	a2, a1
+	bhi	a2, 1f
+		li a0, 1
+1:	jal	sendx	// 0
+
+	li	a0, 2
+	li	a2, 0xf001
+	subc	a2, a1
+	bhs	a2, 1f
+		li a0, 3
+1:	jal	sendx	// 2
+
+	li	a0, 4
+	li	a2, 0xf001
+	subc	a2, a1
+	blo	a2, 1f
+		li a0, 5
+1:	jal	sendx	// 5
+
+	li	a0, 6
+	li	a2, 0xf001
+	subc	a2, a1
+	bls	a2, 1f
+		li a0, 7
+1:	jal	sendx	// 7
+
+	li	a2, 0xf000
+	li	a0, 8
+	subc	a2, a1
+	bhi	a2, 1f
+		li a0, 9
+1:	jal	sendx	// 8
+
+	li	a0, 10
+	li	a2, 0xf000
+	subc	a2, a1
+	bhs	a2, 1f
+		li a0, 11
+1:	jal	sendx	// 0a
+
+	li	a0, 12
+	li	a2, 0xf000
+	subc	a2, a1
+	blo	a2, 1f
+		li a0, 13
+1:	jal	sendx	// 0d
+
+	li	a0, 14
+	li	a2, 0xf000
+	subc	a2, a1
+	bls	a2, 1f
+		li a0, 15
+1:	jal	sendx	// 0e
+
 	
 
 

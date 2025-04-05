@@ -126,7 +126,8 @@ cccc - constant (details vary to make decoding easy)
 10110 RRR Rcc ccccc - sw	RR, ccccccc0(sp)	addr 0 extended		CX0
 10111 222 ccc ccccc - sb	rs2, cccccccc(0)	addr sign extended	CX0
 
-11000 free
+11000 000 ccc ccccc - bhi	cccccccc0(pc)		branch if LSB of mulhi is 0 (note no const extension)
+11000 001 ccc ccccc - blo	cccccccc0(pc)		branch if LSB of mulhi is 1
 11001 222 sss ccccc - stio	rs, ccccc0(rs2) *
 11010 ddd sss ccccc - ldio	rd, ccccc0(rs) *
 11011 rrr rcc ccccc - lui	rr, 1ccccccc00000000 

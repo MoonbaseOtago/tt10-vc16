@@ -97,7 +97,7 @@ module execute(input clk, input reset,
 	assign inv_mmu = (do_inv_mmu?imm[3:0]:0);
 
 
-	wire link = ((br&&cond[2])||jmp)&cond[0];
+	wire link = ((br&&(cond[2:1]==2'b11))||jmp)&cond[0];
 
 
 	reg [RV-1:0]r1, r2, r1reg, r2reg;
@@ -120,7 +120,7 @@ module execute(input clk, input reset,
 		if (VA < RV) begin
 
 			always @(*) 
-			if (br && (!cond[2] || rs1==0 || (sys_trap||interrupt&r_ie))) begin
+			if (br && (cond[2:1]!=2'b11 || rs1==0 || (sys_trap||interrupt&r_ie))) begin
 				r1 = {{(RV-VA){1'b0}}, r_pc, sys_trap||interrupt&r_ie?sup_enabled:1'b0};
 			end else begin
 				r1 = r1reg;
@@ -129,7 +129,7 @@ module execute(input clk, input reset,
 		end else begin
 
 			always @(*) 
-			if (br && (!cond[2] || rs1==0 || (sys_trap||interrupt&r_ie))) begin
+			if (br && (cond[2:1]!=2'b11 || rs1==0 || (sys_trap||interrupt&r_ie))) begin
 				r1 = {r_pc, sys_trap||interrupt&r_ie?sup_enabled:1'b0};
 			end else begin
 				r1 = r1reg;
@@ -175,7 +175,9 @@ module execute(input clk, input reset,
 		3'b0_01:	br_taken = r1reg != 0;	// bnez
 		3'b0_10:	br_taken = !r1reg[RV-1];// bgez
 		3'b0_11:	br_taken = r1reg[RV-1]; // bltz
-		3'b1_??:	br_taken = 1;
+		3'b1_00:	br_taken = !r_mult[16];	// bhi
+		3'b1_01:	br_taken = r_mult[16];	// blo
+		3'b1_1?:	br_taken = 1;
 		endcase
 	end
 
