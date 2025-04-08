@@ -142,7 +142,7 @@ module execute(input clk, input reset,
 
 	wire sup_enabled;
 
-	wire [RV-1:0]csr = {{(RV-8){1'b0}}, mmu_over_write, mmu_i_proxy, mmu_d_proxy,  user_io, r_prev_lui_hi, r_lui_hi,  1'b0, mmu_enable, sup_enabled, r_prev_ie, r_ie};
+	wire [RV-1:0]csr = {{(RV-11){1'b0}}, mmu_over_write, mmu_i_proxy, mmu_d_proxy,  user_io, r_prev_lui_hi, r_lui_hi,  1'b0, mmu_enable, sup_enabled, r_prev_ie, r_ie};
 
 	always @(*)
 	if (r_wb_valid && rs1 == r_wb_addr && r_wb_addr!=0) begin
