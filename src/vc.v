@@ -107,6 +107,8 @@ module vc(input clk, input reset,
 	wire[RV-1:0]mmu_read;
 	wire		supmode;
 	wire		mmu_enable;
+	wire		mmu_over_write;
+	wire		mmu_i_proxy;
 	wire		mmu_d_proxy;
 	wire		mmu_miss_fault, mmu_prot_fault;
 	wire		mmu_fault;
@@ -124,6 +126,8 @@ module vc(input clk, input reset,
 		end else begin
 			mmu   #(.VA(VA), .PA(PA), .RV(RV), .NMMU(NMMU), .USE_LATCHES_FOR_MMU(USE_LATCHES_FOR_MMU))mmu(.clk(clk), .reset(reset), .supmode(supmode),
 						.mmu_enable(mmu_enable),
+						.mmu_over_write(mmu_over_write),
+						.mmu_i_proxy(mmu_i_proxy),
 						.mmu_d_proxy(mmu_d_proxy),
 						.inv_mmu(inv_mmu),
 						.is_pc(ifetch),
@@ -269,6 +273,8 @@ module vc(input clk, input reset,
 		.supmode(supmode),
 		.user_io(user_io),
 		.mmu_enable(mmu_enable),
+		.mmu_over_write(mmu_over_write),
+		.mmu_i_proxy(mmu_i_proxy),
 		.mmu_d_proxy(mmu_d_proxy),
 		.mmu_miss_fault(mmu_miss_fault),
 		.mmu_prot_fault(mmu_prot_fault),

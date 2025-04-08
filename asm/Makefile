@@ -1,4 +1,4 @@
-all:	vcasm  ld
+all:	vcasm  ld nm
 
 vcasm:	main.c vc.tab.c
 	gcc -o vcasm main.c -g
@@ -19,9 +19,21 @@ start.bin:	vcasm start.s
 	./vcasm -b -m -o start.bin start.s
 
 ld:	ld.c	
-	#gcc -std=c90 -I /home/paul/tt10/vc16/bsd/usr/include -I /home/paul/tt10/vc16/bsd/usr//sys -I /home/paul/tt10/vc16/bsd/usr//sys/h -I /home/paul/tt10/vc16/bsd/usr/bin/ar/  -o ld ld.c -g
-	gcc -D_VC_ -std=c90 -I /home/paul/tt10/vc16/bsd/usr/bin/ar/  -o ld ld.c -g
+	gcc -D_VC_ -std=c90 -I ar  -o ld ld.c -g
 
-install:	vcasm ld
+nm:	nm.c	
+	gcc -D_VC_ -std=c90 -I ar -o nm nm.c -g ar/nsym.c
+
+ar/ar:	ar/append.c ar/ar.c ar/archive.c ar/contents.c ar/delete.c ar/extract.c ar/misc.c \
+        ar/move.c ar/print.c ar/replace.c
+	cd ar;make ar
+
+install:	vcasm ld nm ar/ar
 	cp vcasm /usr/local/bin/vc16-bsd-as
 	cp ld /usr/local/bin/vc16-bsd-ld
+	cp nm /usr/local/bin/vc16-bsd-nm
+	cp ar/ar /usr/local/bin/vc16-bsd-ar
+
+clean:
+	rm -f *.o vcasm ld nm
+	cd ar; make clean; 

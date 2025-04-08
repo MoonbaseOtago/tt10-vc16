@@ -196,10 +196,12 @@ The EPC register has thge PC at the point of the last exception, bit 0 is the Ke
 
 The CSR contains various CPU state bits:
 
+* 10 mmu over write - in kernel mode load and store instructions ignore user mode write protection
+* 9 mmu I proxy - in kernel mode load and store instructions use the user mode MMU instruction page mappings (and trap accordingly) - is cleared when an MMU trap occurs
+* 8 mmu D proxy - in kernel mode load and store instructions use the user mode MMU data page mappings (and trap accordingly) - is cleared when an MMU trap occurs
 * 7 user_io - if set usermode can use the stio/ldio instructions (mostly intended for system test)
 * 6 prev_lui -  prev lui to  mulhi 
 * 5 lui      - lui to  mulhi just done in previous instruction
-* 4 mmu D proxy - in kernel mode load and store instructions use the user mode MMU page mappings (and trap accordingly) - is cleared when an MMU trap occurs
 * 3 mmu enable - turns on the MMU
 * 2 kernel mode - (read only, changed by jr (epc)) kernel (1)/user (0) mode
 * 1 previous IE - previous IE

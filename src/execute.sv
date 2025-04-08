@@ -72,6 +72,8 @@ module execute(input clk, input reset,
 		output		user_io,
 		output		mmu_fault,
 		output		mmu_d_proxy,
+		output		mmu_i_proxy,
+		output		mmu_over_write,
 		input		mmu_miss_fault, mmu_prot_fault
 	);
 	parameter RV=32;
@@ -140,7 +142,7 @@ module execute(input clk, input reset,
 
 	wire sup_enabled;
 
-	wire [RV-1:0]csr = {{(RV-8){1'b0}}, user_io, r_prev_lui_hi, r_lui_hi,  mmu_d_proxy, mmu_enable, sup_enabled, r_prev_ie, r_ie};
+	wire [RV-1:0]csr = {{(RV-8){1'b0}}, mmu_over_write, mmu_i_proxy, mmu_d_proxy,  user_io, r_prev_lui_hi, r_lui_hi,  1'b0, mmu_enable, sup_enabled, r_prev_ie, r_ie};
 
 	always @(*)
 	if (r_wb_valid && rs1 == r_wb_addr && r_wb_addr!=0) begin
@@ -470,6 +472,10 @@ module execute(input clk, input reset,
 			assign mmu_enable = r_mmu_enable;
 			reg r_mmu_d_proxy;
 			assign mmu_d_proxy = r_mmu_d_proxy;
+			reg r_mmu_i_proxy;
+			assign mmu_i_proxy = r_mmu_i_proxy;
+			reg r_mmu_over_write;
+			assign mmu_over_write = r_mmu_over_write;
 			
 			assign mmu_reg_data = r_wb;
 			assign mmu_reg_write = r_wb_valid && r_wb_addr == 4'b0101 && sup_enabled;
@@ -528,7 +534,27 @@ module execute(input clk, input reset,
 				r_mmu_d_proxy <= 0;
 			end else
 			if (r_wb_valid && r_wb_addr == 4'b0100 && sup_enabled)
-				r_mmu_d_proxy <= r_wb[4];
+				r_mmu_d_proxy <= r_wb[8];
+
+			always @(posedge clk) 
+			if (reset) begin
+				r_mmu_i_proxy <= 0;
+			end else 
+			if (mmu_trap) begin
+				r_mmu_i_proxy <= 0;
+			end else
+			if (r_wb_valid && r_wb_addr == 4'b0100 && sup_enabled)
+				r_mmu_i_proxy <= r_wb[9];
+
+			always @(posedge clk) 
+			if (reset) begin
+				r_mmu_over_write <= 0;
+			end else 
+			if (mmu_trap) begin
+				r_mmu_over_write <= 0;
+			end else
+			if (r_wb_valid && r_wb_addr == 4'b0100 && sup_enabled)
+				r_mmu_over_write <= r_wb[11];
 
 			assign mmu_trap = (mmu_miss_fault&r_fetch) | ((mmu_miss_fault)&r_read_stall) | ((mmu_miss_fault|mmu_prot_fault)&(|wmask));
 			assign mmu_fault = mmu_trap;

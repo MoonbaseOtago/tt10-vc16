@@ -406,7 +406,7 @@ module decode(input clk, input reset,
 						3'b00?:	begin
 									c_br = 1;
 									c_cond = {2'b10, ins[8]};	// bhi/blo
-									c_rs1 = 3'bxxx;
+									c_rs1 = 4'bxxxx;
 									c_op = `OP_ADD;
 									c_imm = {{(RV-8){ins[0]}}, ins[7:1],1'b0};
 								end

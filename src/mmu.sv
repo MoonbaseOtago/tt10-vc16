@@ -4,7 +4,7 @@
 //	All Rights Reserved
 //
 
-module mmu(input clk,  input reset, input is_pc, input is_write, input is_read, input mmu_enable, input mmu_d_proxy, input supmode,
+module mmu(input clk,  input reset, input is_pc, input is_write, input is_read, input mmu_enable, input mmu_over_write, input mmu_i_proxy, input mmu_d_proxy, input supmode,
 			input [VA-1:RV/16]pcv,
 			input [VA-1:RV/16]addrv, 
 			output [PA-1:RV/16]addrp,
@@ -65,14 +65,14 @@ module mmu(input clk,  input reset, input is_pc, input is_write, input is_read, 
 	wire [$clog2(NMMU):0]sel_d = {supmode&~(mmu_d_proxy&~is_pc), addrv[VA-1:UNTOUCHED]};
 
 	wire mmu_miss_fault_i = mmu_enable && is_pc && !r_valid_i[sel_i];
-	wire mmu_miss_fault_d = mmu_enable && (is_read | is_write) && !r_valid_d[sel_d];
+	wire mmu_miss_fault_d = mmu_enable && (is_read | is_write) && !(supmode&mmu_i_proxy? r_valid_i[sel_d]: r_valid_d[sel_d]);
 	assign mmu_miss_fault = mmu_miss_fault_i|mmu_miss_fault_d;
-	assign mmu_prot_fault = mmu_enable && is_write && !r_writeable_d[sel_d[VA-UNTOUCHED:0]];
+	assign mmu_prot_fault = mmu_enable && is_write && !(mmu_over_write&supmode) && (mmu_i_proxy|!r_writeable_d[sel_d[VA-UNTOUCHED:0]]);
 	reg [PA-1:UNTOUCHED]r_vtop_i[0:2*NMMU-1];
 	reg [PA-1:UNTOUCHED]r_vtop_d[0:2*NMMU-1];
 
 	assign pcp = {(mmu_enable ? r_vtop_i[sel_i]:{{PA-RV{1'b0}}, pcv[VA-1:UNTOUCHED]}), pcv[UNTOUCHED-1:RV/16]};
-	assign addrp = {(mmu_enable ? r_vtop_d[sel_d]:{{PA-RV{1'b0}}, addrv[VA-1:UNTOUCHED]}), addrv[UNTOUCHED-1:RV/16]};
+	assign addrp = {(mmu_enable ? (supmode&mmu_i_proxy? r_vtop_i[sel_d]: r_vtop_d[sel_d]):{{PA-RV{1'b0}}, addrv[VA-1:UNTOUCHED]}), addrv[UNTOUCHED-1:RV/16]};
 
 	wire [$clog2(NMMU):0]reg_addr = {r_fault_sup, r_fault_address[VA-1:UNTOUCHED]};
 

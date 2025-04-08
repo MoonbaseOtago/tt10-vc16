@@ -581,7 +581,7 @@ wrt2:	mv 	a1, mmu
 
 	li	a4, 0x0
 	mv	a2, csr
-	li	a3, 0x10
+	li	a3, 0x100
 	or	a3, a2
 	mv	csr, a3
 	lw	a1, (a4)
@@ -614,7 +614,7 @@ wrt2:	mv 	a1, mmu
 	jal     send             // 0x77
 
 
-	li	a0, 0x11
+	li	a0, 0x101
 	mv	csr, a3
 ff1:	sw	a0, (a4)	// should fail
 	mv	csr, a2
